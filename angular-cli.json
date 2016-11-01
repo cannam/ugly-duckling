@@ -13,10 +13,13 @@
       ],
       "index": "index.html",
       "main": "main.ts",
+      "workerIndex": "index.worker.js",
+      "workerMain": "main.worker.ts",
       "test": "test.ts",
       "tsconfig": "tsconfig.json",
       "prefix": "app",
       "mobile": false,
+      "worker": true,
       "styles": [
         "styles.css"
       ],
