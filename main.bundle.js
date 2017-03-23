@@ -129,7 +129,7 @@ FeatureExtractionService = __decorate([
 ], FeatureExtractionService);
 
 var _a;
-//# sourceMappingURL=/Users/lucast/code/ugly-duckling/src/feature-extraction.service.js.map
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/feature-extraction.service.js.map
 
 /***/ }),
 
@@ -175,7 +175,7 @@ module.exports = module.exports.toString();
 /* harmony namespace reexport (by used) */ __webpack_require__.d(__webpack_exports__, "a", function() { return __WEBPACK_IMPORTED_MODULE_1__app_module__["a"]; });
 
 
-//# sourceMappingURL=/Users/lucast/code/ugly-duckling/src/index.js.map
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/index.js.map
 
 /***/ }),
 
@@ -235,7 +235,7 @@ RecordingControlComponent = __decorate([
 ], RecordingControlComponent);
 
 var _a, _b;
-//# sourceMappingURL=/Users/lucast/code/ugly-duckling/src/recording-control.component.js.map
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/recording-control.component.js.map
 
 /***/ }),
 
@@ -288,7 +288,7 @@ AudioFileOpenComponent = __decorate([
 ], AudioFileOpenComponent);
 
 var _a, _b;
-//# sourceMappingURL=/Users/lucast/code/ugly-duckling/src/audio-file-open.component.js.map
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/audio-file-open.component.js.map
 
 /***/ }),
 
@@ -394,7 +394,7 @@ AppModule = __decorate([
     })
 ], AppModule);
 
-//# sourceMappingURL=/Users/lucast/code/ugly-duckling/src/app.module.js.map
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/app.module.js.map
 
 /***/ }),
 
@@ -463,18 +463,42 @@ class WavesSpectrogramLayer extends __WEBPACK_IMPORTED_MODULE_2_waves_ui___defau
         const defaults = {
             normalise: 'hybrid',
             gain: 40.0,
-            channel: 0,
+            channel: -1,
             stepSize: 512,
             blockSize: 1024
         };
         const mergedOptions = Object.assign({}, defaults, options);
-        super('entity', new SpectrogramEntity(buffer.getChannelData(mergedOptions.channel), mergedOptions), mergedOptions);
+        const getSamples = ((buffer, channel) => {
+            const nch = buffer.numberOfChannels;
+            if (channel >= 0 || nch == 1) {
+                if (channel < 0)
+                    channel = 0;
+                return buffer.getChannelData(channel);
+            }
+            else {
+                const before = performance.now();
+                console.log("mixing down " + nch + " channels for spectrogram...");
+                const mixed = Float32Array.from(buffer.getChannelData(0));
+                const n = mixed.length;
+                for (let ch = 1; ch < nch; ++ch) {
+                    const buf = buffer.getChannelData(ch);
+                    for (let i = 0; i < n; ++i)
+                        mixed[i] += buf[i];
+                }
+                const scale = 1.0 / nch;
+                for (let i = 0; i < n; ++i)
+                    mixed[i] *= scale;
+                console.log("done in " + (performance.now() - before) + "ms");
+                return mixed;
+            }
+        });
+        super('entity', new SpectrogramEntity(getSamples(buffer, mergedOptions.channel), mergedOptions), mergedOptions);
         this.configureShape(__WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.shapes.Matrix, {}, mergedOptions);
     }
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = WavesSpectrogramLayer;
 
-//# sourceMappingURL=/Users/lucast/code/ugly-duckling/src/Spectrogram.js.map
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/Spectrogram.js.map
 
 /***/ }),
 
@@ -556,7 +580,7 @@ module.exports = "<div class=\"container\">\n  <md-select #extractorSelect\n    
 
 
 
-//# sourceMappingURL=/Users/lucast/code/ugly-duckling/src/polyfills.js.map
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/polyfills.js.map
 
 /***/ }),
 
@@ -653,7 +677,7 @@ AppComponent = __decorate([
 ], AppComponent);
 
 var _a, _b, _c, _d;
-//# sourceMappingURL=/Users/lucast/code/ugly-duckling/src/app.component.js.map
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/app.component.js.map
 
 /***/ }),
 
@@ -713,7 +737,7 @@ ProgressSpinnerComponent = __decorate([
     })
 ], ProgressSpinnerComponent);
 
-//# sourceMappingURL=/Users/lucast/code/ugly-duckling/src/progress-spinner.component.js.map
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/progress-spinner.component.js.map
 
 /***/ }),
 
@@ -794,7 +818,7 @@ PlaybackControlComponent = __decorate([
 ], PlaybackControlComponent);
 
 var _a, _b;
-//# sourceMappingURL=/Users/lucast/code/ugly-duckling/src/playback-control.component.js.map
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/playback-control.component.js.map
 
 /***/ }),
 
@@ -807,7 +831,7 @@ const environment = {
 };
 /* harmony export (immutable) */ __webpack_exports__["a"] = environment;
 
-//# sourceMappingURL=/Users/lucast/code/ugly-duckling/src/environment.js.map
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/environment.js.map
 
 /***/ }),
 
@@ -955,7 +979,7 @@ AudioRecorderService = __decorate([
 ], AudioRecorderService);
 
 var _a;
-//# sourceMappingURL=/Users/lucast/code/ugly-duckling/src/audio-recorder.service.js.map
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/audio-recorder.service.js.map
 
 /***/ }),
 
@@ -1241,12 +1265,19 @@ let WaveformComponent = class WaveformComponent {
             color: '#b0b0b0'
         });
         this.addLayer(timeAxis, waveTrack, this.timeline.timeContext, true);
-        const waveformLayer = new __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.helpers.WaveformLayer(buffer, {
-            top: 10,
-            height: height * 0.9,
-            color: 'darkblue'
-        });
-        this.addLayer(waveformLayer, waveTrack, this.timeline.timeContext);
+        const nchannels = buffer.numberOfChannels;
+        const totalWaveHeight = height * 0.9;
+        const waveHeight = totalWaveHeight / nchannels;
+        for (let ch = 0; ch < nchannels; ++ch) {
+            console.log("about to construct a waveform layer for channel " + ch);
+            const waveformLayer = new __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.helpers.WaveformLayer(buffer, {
+                top: (height - totalWaveHeight) / 2 + waveHeight * ch,
+                height: waveHeight,
+                color: 'darkblue',
+                channel: ch
+            });
+            this.addLayer(waveformLayer, waveTrack, this.timeline.timeContext);
+        }
         this.cursorLayer = new __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.helpers.CursorLayer({
             height: height
         });
@@ -1379,11 +1410,16 @@ let WaveformComponent = class WaveformComponent {
                 // TODO refactor, this is incomprehensible
                 if (isMarker) {
                     const plotData = featureData.map(feature => {
-                        return { time: __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_4_piper__["toSeconds"])(feature.timestamp) };
+                        return {
+                            time: __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_4_piper__["toSeconds"])(feature.timestamp),
+                            label: feature.label
+                        };
                     });
                     let featureLayer = new __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.helpers.TickLayer(plotData, {
                         height: height,
                         color: colour,
+                        labelPosition: 'bottom',
+                        shadeSegments: true
                     });
                     this.addLayer(featureLayer, waveTrack, this.timeline.timeContext);
                 }
@@ -1534,9 +1570,14 @@ let WaveformComponent = class WaveformComponent {
     }
     seekStart() {
         this.zoomOnMouseDown = this.timeline.timeContext.zoom;
+        this.offsetOnMouseDown = this.timeline.timeContext.offset;
     }
     seekEnd(x) {
-        if (this.zoomOnMouseDown === this.timeline.timeContext.zoom) {
+        const hasSameZoom = this.zoomOnMouseDown ===
+            this.timeline.timeContext.zoom;
+        const hasSameOffset = this.offsetOnMouseDown ===
+            this.timeline.timeContext.offset;
+        if (hasSameZoom && hasSameOffset) {
             this.seek(x);
         }
     }
@@ -1566,7 +1607,7 @@ WaveformComponent = __decorate([
 ], WaveformComponent);
 
 var _a, _b, _c, _d;
-//# sourceMappingURL=/Users/lucast/code/ugly-duckling/src/waveform.component.js.map
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/waveform.component.js.map
 
 /***/ }),
 
@@ -1658,7 +1699,7 @@ FeatureExtractionMenuComponent = __decorate([
 ], FeatureExtractionMenuComponent);
 
 var _a, _b;
-//# sourceMappingURL=/Users/lucast/code/ugly-duckling/src/feature-extraction-menu.component.js.map
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/feature-extraction-menu.component.js.map
 
 /***/ }),
 
@@ -1758,7 +1799,7 @@ AudioPlayerService = __decorate([
     __metadata("design:paramtypes", [Object, Object])
 ], AudioPlayerService);
 
-//# sourceMappingURL=/Users/lucast/code/ugly-duckling/src/audio-player.service.js.map
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/audio-player.service.js.map
 
 /***/ }),
 
@@ -1781,7 +1822,7 @@ if (__WEBPACK_IMPORTED_MODULE_3__environments_environment__["a" /* environment *
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__angular_core__["a" /* enableProdMode */])();
 }
 __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__angular_platform_browser_dynamic__["a" /* platformBrowserDynamic */])().bootstrapModule(__WEBPACK_IMPORTED_MODULE_4__app___["a" /* AppModule */]);
-//# sourceMappingURL=/Users/lucast/code/ugly-duckling/src/main.js.map
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/main.js.map
 
 /***/ })
 
