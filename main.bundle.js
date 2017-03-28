@@ -415,9 +415,10 @@ AppModule = __decorate([
 
 
 class SpectrogramEntity extends __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.utils.MatrixEntity {
-    constructor(samples, options) {
+    constructor(samples, options, sampleRate) {
         super();
         this.samples = samples;
+        this.sampleRate = sampleRate;
         this.framing = options;
         this.real = new Float32Array(this.framing.blockSize);
         this.nCols = Math.floor(this.samples.length / this.framing.stepSize); //!!! not correct
@@ -433,6 +434,9 @@ class SpectrogramEntity extends __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a
     }
     getColumnHeight() {
         return this.columnHeight;
+    }
+    getStepDuration() {
+        return this.framing.stepSize / this.sampleRate;
     }
     getColumn(n) {
         const startSample = n * this.framing.stepSize;
@@ -492,7 +496,7 @@ class WavesSpectrogramLayer extends __WEBPACK_IMPORTED_MODULE_2_waves_ui___defau
                 return mixed;
             }
         });
-        super('entity', new SpectrogramEntity(getSamples(buffer, mergedOptions.channel), mergedOptions), mergedOptions);
+        super('entity', new SpectrogramEntity(getSamples(buffer, mergedOptions.channel), mergedOptions, buffer.sampleRate), mergedOptions);
         this.configureShape(__WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.shapes.Matrix, {}, mergedOptions);
     }
 }
