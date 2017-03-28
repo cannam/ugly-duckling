@@ -143,7 +143,7 @@ module.exports = "<input #open type=\"file\" accept=\"audio/*\" (change)=\"decod
 /***/ "5xMp":
 /***/ (function(module, exports) {
 
-module.exports = "<md-toolbar color=\"primary\">\n  <md-icon svgIcon=\"duck\"></md-icon>\n\n  <span class=\"app-toolbar-filler\"></span>\n\n  <app-playback-control></app-playback-control>\n  <ugly-recording-control\n    (finishedRecording)=\"onFileOpened($event)\"\n  ></ugly-recording-control>\n\n  <!-- This fills the remaining space of the current row -->\n  <span class=\"app-toolbar-filler\"></span>\n\n\n  <app-audio-file-open (fileOpened)=\"onFileOpened($event)\"></app-audio-file-open>\n  <!-- menu opens when trigger button is clicked -->\n  <button md-icon-button (click)=\"sidenav.toggle()\">\n    <md-icon>extension</md-icon>\n  </button>\n</md-toolbar>\n\n<md-sidenav-container>\n  <md-sidenav #sidenav align=\"start\" mode=\"over\">\n    <app-feature-extraction-menu\n      (requestOutput)=\"extractFeatures($event)\"\n      [disabled]=\"!canExtract\">\n    </app-feature-extraction-menu>\n  </md-sidenav>\n  <app-waveform\n    [audioBuffer]=\"audioBuffer\"\n    ></app-waveform>\n  <ugly-progress-spinner [isVisible]=\"isProcessing\"></ugly-progress-spinner>\n</md-sidenav-container>\n"
+module.exports = "<div class=\"app-container\">\n  <div class=\"app-header\">\n    <md-toolbar color=\"primary\">\n      <md-icon svgIcon=\"duck\"></md-icon>\n\n      <span class=\"app-toolbar-filler\"></span>\n\n      <app-playback-control></app-playback-control>\n      <ugly-recording-control\n        (finishedRecording)=\"onFileOpened($event)\"\n      ></ugly-recording-control>\n\n      <!-- This fills the remaining space of the current row -->\n      <span class=\"app-toolbar-filler\"></span>\n\n\n      <app-audio-file-open\n        (fileOpened)=\"onFileOpened($event)\"\n      ></app-audio-file-open>\n      <!-- menu opens when trigger button is clicked -->\n      <button md-icon-button (click)=\"sidenav.toggle()\">\n        <md-icon>extension</md-icon>\n      </button>\n    </md-toolbar>\n  </div>\n\n  <div class=\"app-content\">\n    <md-sidenav-container>\n      <md-sidenav #sidenav align=\"start\" mode=\"over\">\n        <app-feature-extraction-menu\n          (requestOutput)=\"extractFeatures($event)\"\n          [disabled]=\"!canExtract\">\n        </app-feature-extraction-menu>\n      </md-sidenav>\n      <ugly-notebook-feed\n        [analyses]=\"analyses\"\n        [rootAudioUri]=\"rootAudioUri\"></ugly-notebook-feed>\n    </md-sidenav-container>\n  </div>\n\n  <div class=\"app-footer\">\n    <md-toolbar color=\"primary\">\n\n      <!-- menu opens when trigger button is clicked -->\n      <button md-icon-button (click)=\"sidenav.toggle()\">\n        <md-icon>extension</md-icon>\n      </button>\n    </md-toolbar>\n\n  </div>\n</div>\n"
 
 /***/ }),
 
@@ -155,7 +155,7 @@ exports = module.exports = __webpack_require__("FZ+f")();
 
 
 // module
-exports.push([module.i, ".track{height:100%}", ""]);
+exports.push([module.i, ".track{height:160px;width:100%}", ""]);
 
 // exports
 
@@ -311,10 +311,14 @@ var _a, _b;
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_12__progress_spinner_progress_spinner_component__ = __webpack_require__("iHFK");
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_13__services_audio_recorder_audio_recorder_service__ = __webpack_require__("pcIR");
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_14__recording_control_recording_control_component__ = __webpack_require__("7vD/");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_15__notebook_feed_notebook_feed_component__ = __webpack_require__("Qvmv");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_16__analysis_item_analysis_item_component__ = __webpack_require__("jat4");
 /* unused harmony export createAudioContext */
 /* unused harmony export createAudioElement */
 /* unused harmony export createAudioInputProvider */
 /* unused harmony export createMediaRecorderFactory */
+/* unused harmony export createUrlResourceManager */
+/* unused harmony export createResourceReader */
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "a", function() { return AppModule; });
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
@@ -322,6 +326,8 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+
+
 
 
 
@@ -361,6 +367,31 @@ function createMediaRecorderFactory() {
         return __WEBPACK_IMPORTED_MODULE_13__services_audio_recorder_audio_recorder_service__["a" /* ThrowingMediaRecorder */];
     }
 }
+function createUrlResourceManager() {
+    return {
+        createUrlToResource: (resource) => {
+            return URL.createObjectURL(resource);
+        },
+        revokeUrlToResource: (url) => {
+            URL.revokeObjectURL(url);
+        }
+    };
+}
+function createResourceReader() {
+    return (resource) => {
+        return new Promise((res, rej) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                res(event.target.result);
+            };
+            reader.onerror = (event) => {
+                rej(event.message);
+            };
+            reader.readAsArrayBuffer(resource);
+        });
+    };
+    ;
+}
 let AppModule = class AppModule {
 };
 AppModule = __decorate([
@@ -372,7 +403,9 @@ AppModule = __decorate([
             __WEBPACK_IMPORTED_MODULE_8__playback_control_playback_control_component__["a" /* PlaybackControlComponent */],
             __WEBPACK_IMPORTED_MODULE_14__recording_control_recording_control_component__["a" /* RecordingControlComponent */],
             __WEBPACK_IMPORTED_MODULE_11__feature_extraction_menu_feature_extraction_menu_component__["a" /* FeatureExtractionMenuComponent */],
-            __WEBPACK_IMPORTED_MODULE_12__progress_spinner_progress_spinner_component__["a" /* ProgressSpinnerComponent */]
+            __WEBPACK_IMPORTED_MODULE_12__progress_spinner_progress_spinner_component__["a" /* ProgressSpinnerComponent */],
+            __WEBPACK_IMPORTED_MODULE_16__analysis_item_analysis_item_component__["a" /* AnalysisItemComponent */],
+            __WEBPACK_IMPORTED_MODULE_15__notebook_feed_notebook_feed_component__["a" /* NotebookFeedComponent */]
         ],
         imports: [
             __WEBPACK_IMPORTED_MODULE_0__angular_platform_browser__["a" /* BrowserModule */],
@@ -388,7 +421,9 @@ AppModule = __decorate([
             __WEBPACK_IMPORTED_MODULE_13__services_audio_recorder_audio_recorder_service__["b" /* AudioRecorderService */],
             __WEBPACK_IMPORTED_MODULE_10__services_feature_extraction_feature_extraction_service__["a" /* FeatureExtractionService */],
             { provide: 'MediaRecorderFactory', useFactory: createMediaRecorderFactory },
-            { provide: 'PiperRepoUri', useValue: 'assets/remote-plugins.json' }
+            { provide: 'PiperRepoUri', useValue: 'assets/remote-plugins.json' },
+            { provide: 'UrlResourceLifetimeManager', useFactory: createUrlResourceManager },
+            { provide: 'ResourceReader', useFactory: createResourceReader }
         ],
         bootstrap: [__WEBPACK_IMPORTED_MODULE_4__app_component__["a" /* AppComponent */]]
     })
@@ -520,6 +555,66 @@ webpackEmptyContext.id = "MOVZ";
 
 /***/ }),
 
+/***/ "Qvmv":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__angular_core__ = __webpack_require__("Rw+2");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_waves_ui__ = __webpack_require__("myhA");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_waves_ui___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_waves_ui__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "a", function() { return NotebookFeedComponent; });
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+/**
+ * Created by lucast on 21/03/2017.
+ */
+
+
+let NotebookFeedComponent = class NotebookFeedComponent {
+    constructor() {
+        this.sharedTimeline = new __WEBPACK_IMPORTED_MODULE_1_waves_ui___default.a.core.Timeline();
+        this.analyses = [];
+    }
+    set rootAudioUri(uri) {
+        this._rootAudioUri = uri;
+        // TODO is this safe? will the fact references are held elsewhere
+        // keep the previous instance alive? Or will it get garbage collected in
+        // screw previous layers up?
+        this.sharedTimeline = new __WEBPACK_IMPORTED_MODULE_1_waves_ui___default.a.core.Timeline();
+    }
+    get rootAudioUri() {
+        return this._rootAudioUri;
+    }
+};
+__decorate([
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["w" /* Input */])(),
+    __metadata("design:type", Array)
+], NotebookFeedComponent.prototype, "analyses", void 0);
+__decorate([
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["w" /* Input */])(),
+    __metadata("design:type", String),
+    __metadata("design:paramtypes", [String])
+], NotebookFeedComponent.prototype, "rootAudioUri", null);
+NotebookFeedComponent = __decorate([
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["Q" /* Component */])({
+        selector: 'ugly-notebook-feed',
+        template: __webpack_require__("vB4/"),
+        styles: [__webpack_require__("lZe/")]
+    }),
+    __metadata("design:paramtypes", [])
+], NotebookFeedComponent);
+
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/notebook-feed.component.js.map
+
+/***/ }),
+
 /***/ "W1+o":
 /***/ (function(module, exports) {
 
@@ -618,40 +713,64 @@ let AppComponent = class AppComponent {
         this.piperService = piperService;
         this.iconRegistry = iconRegistry;
         this.sanitizer = sanitizer;
+        this.analyses = [];
         this.canExtract = false;
-        this.isProcessing = false;
+        this.nRecordings = 0;
+        this.countingId = 1;
         iconRegistry.addSvgIcon('duck', sanitizer.bypassSecurityTrustResourceUrl('assets/duck.svg'));
+        this.onAudioDataSubscription = this.audioService.audioLoaded$.subscribe(resource => {
+            const wasError = resource.message != null;
+            if (wasError) {
+                this.analyses.shift();
+                this.canExtract = false;
+            }
+            else {
+                this.audioBuffer = resource.samples;
+                if (this.audioBuffer) {
+                    this.canExtract = true;
+                }
+            }
+        });
     }
     onFileOpened(file) {
         this.canExtract = false;
-        this.isProcessing = true;
-        const reader = new FileReader();
-        const mimeType = file.type;
-        reader.onload = (event) => {
-            const url = file instanceof Blob ? URL.createObjectURL(file) :
-                URL.createObjectURL(new Blob([event.target.result], { type: mimeType }));
-            this.audioService.loadAudioFromUrl(url);
-            // TODO use a rxjs/Subject instead?
-            this.audioService.decodeAudioData(event.target.result)
-                .then(audioBuffer => {
-                this.audioBuffer = audioBuffer;
-                if (this.audioBuffer) {
-                    this.canExtract = true;
-                    this.isProcessing = false;
-                }
-            }).catch(error => {
-                this.canExtract = false;
-                this.isProcessing = false;
-                console.warn(error);
-            });
-        };
-        reader.readAsArrayBuffer(file);
+        const url = this.audioService.loadAudio(file);
+        this.rootAudioUri = url; // TODO this isn't going to work to id previously loaded files
+        // TODO is it safe to assume it is a recording?
+        const title = (file instanceof File) ?
+            file.name : `Recording ${this.nRecordings++}`;
+        if (this.analyses.filter(item => item.title === title).length > 0) {
+            // TODO this reveals how brittle the current name / uri based id is
+            // need something more robust, and also need to notify the user
+            // in a suitable way in the actual event of a duplicate file
+            console.warn('There is already a notebook based on this audio file.');
+            return;
+        }
+        // TODO re-ordering of items for display
+        // , one alternative is a Angular Pipe / Filter for use in the Template
+        this.analyses.unshift({
+            rootAudioUri: url,
+            hasSharedTimeline: true,
+            extractorKey: 'not:real',
+            isRoot: true,
+            title: title,
+            description: new Date().toLocaleString(),
+            id: `${this.countingId++}`
+        });
     }
     extractFeatures(outputInfo) {
         if (!this.canExtract || !outputInfo)
             return;
         this.canExtract = false;
-        this.isProcessing = true;
+        this.analyses.unshift({
+            rootAudioUri: this.rootAudioUri,
+            hasSharedTimeline: true,
+            extractorKey: outputInfo.combinedKey,
+            isRoot: false,
+            title: outputInfo.name,
+            description: outputInfo.outputId,
+            id: `${this.countingId++}`
+        });
         this.piperService.collect({
             audioData: [...Array(this.audioBuffer.numberOfChannels).keys()]
                 .map(i => this.audioBuffer.getChannelData(i)),
@@ -663,12 +782,13 @@ let AppComponent = class AppComponent {
             outputId: outputInfo.outputId
         }).then(() => {
             this.canExtract = true;
-            this.isProcessing = false;
         }).catch(err => {
             this.canExtract = true;
-            this.isProcessing = false;
             console.error(err);
         });
+    }
+    ngOnDestroy() {
+        this.onAudioDataSubscription.unsubscribe();
     }
 };
 AppComponent = __decorate([
@@ -682,6 +802,31 @@ AppComponent = __decorate([
 
 var _a, _b, _c, _d;
 //# sourceMappingURL=/home/cannam/code/ugly-duckling/src/app.component.js.map
+
+/***/ }),
+
+/***/ "c1nP":
+/***/ (function(module, exports, __webpack_require__) {
+
+exports = module.exports = __webpack_require__("FZ+f")();
+// imports
+
+
+// module
+exports.push([module.i, "md-card{padding-left:0;padding-right:0;width:100%}md-card-actions{width:calc(100% - 16px);padding-left:16px}md-card-header{margin-bottom:8px}", ""]);
+
+// exports
+
+
+/*** EXPORTS FROM exports-loader ***/
+module.exports = module.exports.toString();
+
+/***/ }),
+
+/***/ "cqUy":
+/***/ (function(module, exports) {
+
+module.exports = "<md-card>\n  <md-card-header>\n    <md-card-title>{{title}}</md-card-title>\n    <md-card-subtitle>{{description}}</md-card-subtitle>\n  </md-card-header>\n  <md-card-content>\n    <app-waveform\n      [timeline]=\"timeline\"\n      [trackIdPrefix]=\" id || title\"\n      [isSubscribedToAudioService]=\"isActive && isRoot\"\n      [isSubscribedToExtractionService]=\"isActive && !isRoot\"\n      [isOneShotExtractor]=\"true\"\n      [isSeeking]=\"isActive\"\n    ></app-waveform>\n  </md-card-content>\n</md-card>\n"
 
 /***/ }),
 
@@ -729,8 +874,8 @@ ProgressSpinnerComponent = __decorate([
       height: 40px;
       width: 40px;
       position: absolute;
-      top: calc(100% - 40px);
-      left: calc(100% - 40px);
+      top: calc(50% - 20px);
+      left: calc(50% - 20px);
     }
     
     .spinner {
@@ -760,6 +905,63 @@ exports.push([module.i, "", ""]);
 
 /*** EXPORTS FROM exports-loader ***/
 module.exports = module.exports.toString();
+
+/***/ }),
+
+/***/ "jat4":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__angular_core__ = __webpack_require__("Rw+2");
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "a", function() { return AnalysisItemComponent; });
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+/**
+ * Created by lucast on 21/03/2017.
+ */
+
+let AnalysisItemComponent = class AnalysisItemComponent {
+};
+__decorate([
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["w" /* Input */])(),
+    __metadata("design:type", Object)
+], AnalysisItemComponent.prototype, "timeline", void 0);
+__decorate([
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["w" /* Input */])(),
+    __metadata("design:type", String)
+], AnalysisItemComponent.prototype, "title", void 0);
+__decorate([
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["w" /* Input */])(),
+    __metadata("design:type", String)
+], AnalysisItemComponent.prototype, "description", void 0);
+__decorate([
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["w" /* Input */])(),
+    __metadata("design:type", Boolean)
+], AnalysisItemComponent.prototype, "isActive", void 0);
+__decorate([
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["w" /* Input */])(),
+    __metadata("design:type", Boolean)
+], AnalysisItemComponent.prototype, "isRoot", void 0);
+__decorate([
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["w" /* Input */])(),
+    __metadata("design:type", String)
+], AnalysisItemComponent.prototype, "id", void 0);
+AnalysisItemComponent = __decorate([
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["Q" /* Component */])({
+        selector: 'ugly-analysis-item',
+        template: __webpack_require__("cqUy"),
+        styles: [__webpack_require__("c1nP")]
+    })
+], AnalysisItemComponent);
+
+//# sourceMappingURL=/home/cannam/code/ugly-duckling/src/analysis-item.component.js.map
 
 /***/ }),
 
@@ -839,6 +1041,24 @@ const environment = {
 
 /***/ }),
 
+/***/ "lZe/":
+/***/ (function(module, exports, __webpack_require__) {
+
+exports = module.exports = __webpack_require__("FZ+f")();
+// imports
+
+
+// module
+exports.push([module.i, ".break{margin-bottom:32px}", ""]);
+
+// exports
+
+
+/*** EXPORTS FROM exports-loader ***/
+module.exports = module.exports.toString();
+
+/***/ }),
+
 /***/ "nKj7":
 /***/ (function(module, exports) {
 
@@ -854,7 +1074,7 @@ exports = module.exports = __webpack_require__("FZ+f")();
 
 
 // module
-exports.push([module.i, ".app-toolbar-filler{-webkit-box-flex:1;-ms-flex:1 1 auto;flex:1 1 auto}md-sidenav-container{height:calc(100vh - 64px)}md-sidenav{text-align:center}md-tab-group{height:calc(100vh - 64px)}md-tab-group>>>.md-tab-body-wrapper{-webkit-box-align:center;-ms-flex-align:center;align-items:center}", ""]);
+exports.push([module.i, ".app-toolbar-filler{-webkit-box-flex:1;-ms-flex:1 1 auto;flex:1 1 auto}md-sidenav-container{height:100%;width:100%;position:absolute}md-sidenav{text-align:center}.app-container{height:100%;display:-webkit-box;display:-ms-flexbox;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;-ms-flex-direction:column;flex-direction:column}.app-header{-webkit-box-flex:0;-ms-flex:0 0 auto;flex:0 0 auto}.app-content{-webkit-box-flex:1;-ms-flex:1 1 auto;flex:1 1 auto;overflow-y:auto;position:relative}.app-footer{-webkit-box-flex:0;-ms-flex:0 0 auto;flex:0 0 auto}", ""]);
 
 // exports
 
@@ -990,7 +1210,7 @@ var _a;
 /***/ "pox9":
 /***/ (function(module, exports) {
 
-module.exports = "<div\n  #track class=\"track\"\n  (mousedown)=\"seekStart()\"\n  (mouseup)=\"seekEnd($event.clientX)\"></div>\n"
+module.exports = "<div\n  #track class=\"track\"\n  (mousedown)=\"seekStart()\"\n  (mouseup)=\"seekEnd($event.clientX)\"></div>\n<template [ngIf]=\"isLoading\">\n  <ugly-progress-spinner [isVisible]=\"true\"></ugly-progress-spinner>\n</template>\n"
 
 /***/ }),
 
@@ -1048,42 +1268,116 @@ let WaveformComponent = class WaveformComponent {
         this.audioService = audioService;
         this.piperService = piperService;
         this.ngZone = ngZone;
-        this._audioBuffer = undefined;
+        this.isSubscribedToAudioService = true;
+        this.isSeeking = true;
+        this.layers = [];
+        this.audioBuffer = undefined;
         this.timeline = undefined;
         this.cursorLayer = undefined;
         this.isPlaying = false;
-        const colours = function* () {
-            const circularColours = [
-                'black',
-                'red',
-                'green',
-                'purple',
-                'orange'
-            ];
-            let index = 0;
-            const nColours = circularColours.length;
-            while (true) {
-                yield circularColours[index = ++index % nColours];
+        this.isLoading = true;
+    }
+    set isSubscribedToExtractionService(isSubscribed) {
+        if (isSubscribed) {
+            if (this.featureExtractionSubscription) {
+                return;
             }
-        }();
-        this.featureExtractionSubscription = piperService.featuresExtracted$.subscribe(features => {
-            this.renderFeatures(features, colours.next().value);
-        });
-        this.playingStateSubscription = audioService.playingStateChange$.subscribe(isPlaying => {
-            this.isPlaying = isPlaying;
-            if (this.isPlaying)
-                this.animate();
-        });
-        this.seekedSubscription = audioService.seeked$.subscribe(() => {
-            if (!this.isPlaying)
-                this.animate();
-        });
+            const colours = function* () {
+                const circularColours = [
+                    'black',
+                    'red',
+                    'green',
+                    'purple',
+                    'orange'
+                ];
+                let index = 0;
+                const nColours = circularColours.length;
+                while (true) {
+                    yield circularColours[index = ++index % nColours];
+                }
+            }();
+            this.featureExtractionSubscription =
+                this.piperService.featuresExtracted$.subscribe(features => {
+                    this.renderFeatures(features, colours.next().value);
+                });
+        }
+        else {
+            if (this.featureExtractionSubscription) {
+                this.featureExtractionSubscription.unsubscribe();
+            }
+        }
+    }
+    set isSubscribedToAudioService(isSubscribed) {
+        this._isSubscribedToAudioService = isSubscribed;
+        if (isSubscribed) {
+            if (this.onAudioDataSubscription) {
+                return;
+            }
+            this.onAudioDataSubscription =
+                this.audioService.audioLoaded$.subscribe(res => {
+                    const wasError = res.message != null;
+                    if (wasError) {
+                        console.warn('No audio, display error?');
+                    }
+                    else {
+                        this.audioBuffer = res.samples;
+                    }
+                });
+        }
+        else {
+            if (this.onAudioDataSubscription) {
+                this.onAudioDataSubscription.unsubscribe();
+            }
+        }
+    }
+    get isSubscribedToAudioService() {
+        return this._isSubscribedToAudioService;
+    }
+    set isOneShotExtractor(isOneShot) {
+        this._isOneShotExtractor = isOneShot;
+    }
+    get isOneShotExtractor() {
+        return this._isOneShotExtractor;
+    }
+    set isSeeking(isSeeking) {
+        this._isSeeking = isSeeking;
+        if (isSeeking) {
+            if (this.seekedSubscription) {
+                return;
+            }
+            if (this.playingStateSubscription) {
+                return;
+            }
+            this.seekedSubscription = this.audioService.seeked$.subscribe(() => {
+                if (!this.isPlaying)
+                    this.animate();
+            });
+            this.playingStateSubscription =
+                this.audioService.playingStateChange$.subscribe(isPlaying => {
+                    this.isPlaying = isPlaying;
+                    if (this.isPlaying)
+                        this.animate();
+                });
+        }
+        else {
+            if (this.isPlaying) {
+                this.isPlaying = false;
+            }
+            if (this.playingStateSubscription) {
+                this.playingStateSubscription.unsubscribe();
+            }
+            if (this.seekedSubscription) {
+                this.seekedSubscription.unsubscribe();
+            }
+        }
+    }
+    get isSeeking() {
+        return this._isSeeking;
     }
     set audioBuffer(buffer) {
         this._audioBuffer = buffer || undefined;
         if (this.audioBuffer) {
             this.renderWaveform(this.audioBuffer);
-            this.renderSpectrogram(this.audioBuffer);
         }
     }
     get audioBuffer() {
@@ -1092,18 +1386,137 @@ let WaveformComponent = class WaveformComponent {
     ngOnInit() {
     }
     ngAfterViewInit() {
-        this.timeline = this.renderTimeline();
+        this.trackIdPrefix = this.trackIdPrefix || "default";
+        if (this.timeline) {
+            this.renderTimeline(null, true, true);
+        }
+        else {
+            this.renderTimeline();
+        }
     }
-    renderTimeline(duration = 1.0) {
+    renderTimeline(duration = 1.0, useExistingDuration = false, isInitialRender = false) {
         const track = this.trackDiv.nativeElement;
         track.innerHTML = "";
         const height = track.getBoundingClientRect().height;
         const width = track.getBoundingClientRect().width;
         const pixelsPerSecond = width / duration;
-        const timeline = new __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.core.Timeline(pixelsPerSecond, width);
-        timeline.createTrack(track, height / 2, 'wave');
-        timeline.createTrack(track, height / 2, 'grid');
-        return timeline;
+        const hasExistingTimeline = this.timeline instanceof __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.core.Timeline;
+        if (hasExistingTimeline) {
+            if (!useExistingDuration) {
+                this.timeline.pixelsPerSecond = pixelsPerSecond;
+                this.timeline.visibleWidth = width;
+            }
+        }
+        else {
+            this.timeline = new __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.core.Timeline(pixelsPerSecond, width);
+        }
+        const waveTrack = this.timeline.createTrack(track, height, `wave-${this.trackIdPrefix}`);
+        if (isInitialRender && hasExistingTimeline) {
+            // time axis
+            const timeAxis = new __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.helpers.TimeAxisLayer({
+                height: height,
+                color: '#b0b0b0'
+            });
+            this.addLayer(timeAxis, waveTrack, this.timeline.timeContext, true);
+            this.cursorLayer = new __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.helpers.CursorLayer({
+                height: height
+            });
+            this.addLayer(this.cursorLayer, waveTrack, this.timeline.timeContext);
+        }
+        if ('ontouchstart' in window) {
+            let zoomGestureJustEnded = false;
+            const pixelToExponent = __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.utils.scales.linear()
+                .domain([0, 100]) // 100px => factor 2
+                .range([0, 1]);
+            const calculateDistance = (p1, p2) => {
+                return Math.pow(Math.pow(p2.x - p1.x, 2) +
+                    Math.pow(p2.y - p1.y, 2), 0.5);
+            };
+            const calculateMidPoint = (p1, p2) => {
+                return {
+                    x: 0.5 * (p1.x + p2.x),
+                    y: 0.5 * (p1.y + p2.y)
+                };
+            };
+            const hammertime = new __WEBPACK_IMPORTED_MODULE_5_hammerjs__["Manager"](this.trackDiv.nativeElement, {
+                recognizers: [
+                    [__WEBPACK_IMPORTED_MODULE_5_hammerjs__["Pan"], { direction: __WEBPACK_IMPORTED_MODULE_5_hammerjs__["DIRECTION_HORIZONTAL"] }]
+                ]
+            });
+            // it seems HammerJs binds the event to the window?
+            // causing these events to propagate to other components?
+            const componentTimeline = this.timeline;
+            let initialZoom;
+            let initialDistance;
+            let offsetAtPanStart;
+            let startX;
+            let isZooming;
+            const scroll = (ev) => {
+                if (ev.center.x - startX === 0)
+                    return;
+                if (zoomGestureJustEnded) {
+                    zoomGestureJustEnded = false;
+                    console.log("Skip this event: likely a single touch dangling from pinch");
+                    return;
+                }
+                componentTimeline.timeContext.offset = offsetAtPanStart +
+                    componentTimeline.timeContext.timeToPixel.invert(ev.deltaX);
+                componentTimeline.tracks.update();
+            };
+            const zoom = (ev) => {
+                if (ev.touches.length < 2)
+                    return;
+                const minZoom = componentTimeline.state.minZoom;
+                const maxZoom = componentTimeline.state.maxZoom;
+                const p1 = {
+                    x: ev.touches[0].clientX,
+                    y: ev.touches[0].clientY
+                };
+                const p2 = {
+                    x: ev.touches[1].clientX,
+                    y: ev.touches[1].clientY
+                };
+                const distance = calculateDistance(p1, p2);
+                const midPoint = calculateMidPoint(p1, p2);
+                const lastCenterTime = componentTimeline.timeContext.timeToPixel.invert(midPoint.x);
+                const exponent = pixelToExponent(distance - initialDistance);
+                const targetZoom = initialZoom * Math.pow(2, exponent);
+                componentTimeline.timeContext.zoom =
+                    Math.min(Math.max(targetZoom, minZoom), maxZoom);
+                const newCenterTime = componentTimeline.timeContext.timeToPixel.invert(midPoint.x);
+                componentTimeline.timeContext.offset += newCenterTime - lastCenterTime;
+                componentTimeline.tracks.update();
+            };
+            hammertime.on('panstart', (ev) => {
+                offsetAtPanStart = componentTimeline.timeContext.offset;
+                startX = ev.center.x;
+            });
+            hammertime.on('panleft', scroll);
+            hammertime.on('panright', scroll);
+            const element = this.trackDiv.nativeElement;
+            element.addEventListener('touchstart', (e) => {
+                if (e.touches.length < 2)
+                    return;
+                isZooming = true;
+                initialZoom = componentTimeline.timeContext.zoom;
+                initialDistance = calculateDistance({
+                    x: e.touches[0].clientX,
+                    y: e.touches[0].clientY
+                }, {
+                    x: e.touches[1].clientX,
+                    y: e.touches[1].clientY
+                });
+            });
+            element.addEventListener('touchend', () => {
+                if (isZooming) {
+                    isZooming = false;
+                    zoomGestureJustEnded = true;
+                }
+            });
+            element.addEventListener('touchmove', zoom);
+        }
+        // this.timeline.createTrack(track, height/2, `wave-${this.trackIdPrefix}`);
+        // this.timeline.createTrack(track, height/2, `grid-${this.trackIdPrefix}`);
     }
     estimatePercentile(matrix, percentile) {
         // our sample is not evenly distributed across the whole data set:
@@ -1239,18 +1652,22 @@ let WaveformComponent = class WaveformComponent {
             const trackLayers = Array.from(track.layers);
             while (trackLayers.length) {
                 let layer = trackLayers.pop();
-                track.remove(layer);
-                const index = timeContextChildren.indexOf(layer.timeContext);
-                if (index >= 0) {
-                    timeContextChildren.splice(index, 1);
+                if (this.layers.includes(layer)) {
+                    track.remove(layer);
+                    this.layers.splice(this.layers.indexOf(layer), 1);
+                    const index = timeContextChildren.indexOf(layer.timeContext);
+                    if (index >= 0) {
+                        timeContextChildren.splice(index, 1);
+                    }
+                    layer.destroy();
                 }
-                layer.destroy();
             }
         }
     }
     renderWaveform(buffer) {
-        const height = this.trackDiv.nativeElement.getBoundingClientRect().height / 2;
-        const waveTrack = this.timeline.getTrackById('wave');
+        // const height: number = this.trackDiv.nativeElement.getBoundingClientRect().height / 2;
+        const height = this.trackDiv.nativeElement.getBoundingClientRect().height;
+        const waveTrack = this.timeline.getTrackById(`wave-${this.trackIdPrefix}`);
         if (this.timeline) {
             // resize
             const width = this.trackDiv.nativeElement.getBoundingClientRect().width;
@@ -1260,7 +1677,7 @@ let WaveformComponent = class WaveformComponent {
             waveTrack.height = height;
         }
         else {
-            this.timeline = this.renderTimeline(buffer.duration);
+            this.renderTimeline(buffer.duration);
         }
         this.timeline.timeContext.offset = 0.5 * this.timeline.timeContext.visibleDuration;
         // time axis
@@ -1289,71 +1706,12 @@ let WaveformComponent = class WaveformComponent {
         this.timeline.state = new __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.states.CenteredZoomState(this.timeline);
         waveTrack.render();
         waveTrack.update();
-        if ('ontouchstart' in window) {
-            let zoomGestureJustEnded = false;
-            const pixelToExponent = __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.utils.scales.linear()
-                .domain([0, 100]) // 100px => factor 2
-                .range([0, 1]);
-            const calculateDistance = (p1, p2) => {
-                return Math.pow(Math.pow(p2.x - p1.x, 2) +
-                    Math.pow(p2.y - p1.y, 2), 0.5);
-            };
-            const hammertime = new __WEBPACK_IMPORTED_MODULE_5_hammerjs__(this.trackDiv.nativeElement);
-            const scroll = (ev) => {
-                if (zoomGestureJustEnded) {
-                    zoomGestureJustEnded = false;
-                    console.log("Skip this event: likely a single touch dangling from pinch");
-                    return;
-                }
-                this.timeline.timeContext.offset = this.offsetAtPanStart +
-                    this.timeline.timeContext.timeToPixel.invert(ev.deltaX);
-                this.timeline.tracks.update();
-            };
-            const zoom = (ev) => {
-                const minZoom = this.timeline.state.minZoom;
-                const maxZoom = this.timeline.state.maxZoom;
-                const distance = calculateDistance({
-                    x: ev.pointers[0].clientX,
-                    y: ev.pointers[0].clientY
-                }, {
-                    x: ev.pointers[1].clientX,
-                    y: ev.pointers[1].clientY
-                });
-                const lastCenterTime = this.timeline.timeContext.timeToPixel.invert(ev.center.x);
-                const exponent = pixelToExponent(distance - this.initialDistance);
-                const targetZoom = this.initialZoom * Math.pow(2, exponent);
-                this.timeline.timeContext.zoom =
-                    Math.min(Math.max(targetZoom, minZoom), maxZoom);
-                const newCenterTime = this.timeline.timeContext.timeToPixel.invert(ev.center.x);
-                this.timeline.timeContext.offset += newCenterTime - lastCenterTime;
-                this.timeline.tracks.update();
-            };
-            hammertime.get('pinch').set({ enable: true });
-            hammertime.on('panstart', () => {
-                this.offsetAtPanStart = this.timeline.timeContext.offset;
-            });
-            hammertime.on('panleft', scroll);
-            hammertime.on('panright', scroll);
-            hammertime.on('pinchstart', (e) => {
-                this.initialZoom = this.timeline.timeContext.zoom;
-                this.initialDistance = calculateDistance({
-                    x: e.pointers[0].clientX,
-                    y: e.pointers[0].clientY
-                }, {
-                    x: e.pointers[1].clientX,
-                    y: e.pointers[1].clientY
-                });
-            });
-            hammertime.on('pinch', zoom);
-            hammertime.on('pinchend', () => {
-                zoomGestureJustEnded = true;
-            });
-        }
+        this.isLoading = false;
         this.animate();
     }
     renderSpectrogram(buffer) {
         const height = this.trackDiv.nativeElement.getBoundingClientRect().height / 2;
-        const gridTrack = this.timeline.getTrackById('grid');
+        const gridTrack = this.timeline.getTrackById(`grid-${this.trackIdPrefix}`);
         const spectrogramLayer = new __WEBPACK_IMPORTED_MODULE_6__spectrogram_Spectrogram__["a" /* WavesSpectrogramLayer */](buffer, {
             top: height * 0.05,
             height: height * 0.9,
@@ -1367,14 +1725,19 @@ let WaveformComponent = class WaveformComponent {
     }
     // TODO refactor - this doesn't belong here
     renderFeatures(extracted, colour) {
+        if (this.isOneShotExtractor && !this.hasShot) {
+            this.featureExtractionSubscription.unsubscribe();
+            this.hasShot = true;
+        }
         if (!extracted.hasOwnProperty('features') || !extracted.hasOwnProperty('outputDescriptor'))
             return;
         if (!extracted.features.hasOwnProperty('shape') || !extracted.features.hasOwnProperty('data'))
             return;
         const features = extracted.features;
         const outputDescriptor = extracted.outputDescriptor;
-        const height = this.trackDiv.nativeElement.getBoundingClientRect().height / 2;
-        const waveTrack = this.timeline.getTrackById('wave');
+        // const height = this.trackDiv.nativeElement.getBoundingClientRect().height / 2;
+        const height = this.trackDiv.nativeElement.getBoundingClientRect().height;
+        const waveTrack = this.timeline.getTrackById(`wave-${this.trackIdPrefix}`);
         // TODO refactor all of this
         switch (features.shape) {
             case 'vector': {
@@ -1506,9 +1869,12 @@ let WaveformComponent = class WaveformComponent {
                 console.log("Cannot render an appropriate layer for feature shape '" +
                     features.shape + "'");
         }
+        this.isLoading = false;
         this.timeline.tracks.update();
     }
     animate() {
+        if (!this.isSeeking)
+            return;
         this.ngZone.runOutsideAngular(() => {
             // listen for time passing...
             const updateSeekingCursor = () => {
@@ -1550,6 +1916,7 @@ let WaveformComponent = class WaveformComponent {
                 timeContext : new __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.core.LayerTimeContext(timeContext));
         }
         track.add(layer);
+        this.layers.push(layer);
         layer.render();
         layer.update();
         if (this.cursorLayer && track.$layout.contains(this.cursorLayer.$el)) {
@@ -1568,9 +1935,14 @@ let WaveformComponent = class WaveformComponent {
         layer.update();
     }
     ngOnDestroy() {
-        this.featureExtractionSubscription.unsubscribe();
-        this.playingStateSubscription.unsubscribe();
-        this.seekedSubscription.unsubscribe();
+        if (this.featureExtractionSubscription)
+            this.featureExtractionSubscription.unsubscribe();
+        if (this.playingStateSubscription)
+            this.playingStateSubscription.unsubscribe();
+        if (this.seekedSubscription)
+            this.seekedSubscription.unsubscribe();
+        if (this.onAudioDataSubscription)
+            this.onAudioDataSubscription.unsubscribe();
     }
     seekStart() {
         this.zoomOnMouseDown = this.timeline.timeContext.zoom;
@@ -1588,7 +1960,9 @@ let WaveformComponent = class WaveformComponent {
     seek(x) {
         if (this.timeline) {
             const timeContext = this.timeline.timeContext;
-            this.audioService.seekTo(timeContext.timeToPixel.invert(x) - timeContext.offset);
+            if (this.isSeeking) {
+                this.audioService.seekTo(timeContext.timeToPixel.invert(x) - timeContext.offset);
+            }
         }
     }
 };
@@ -1598,9 +1972,32 @@ __decorate([
 ], WaveformComponent.prototype, "trackDiv", void 0);
 __decorate([
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["w" /* Input */])(),
-    __metadata("design:type", Object),
-    __metadata("design:paramtypes", [Object])
-], WaveformComponent.prototype, "audioBuffer", null);
+    __metadata("design:type", Object)
+], WaveformComponent.prototype, "timeline", void 0);
+__decorate([
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["w" /* Input */])(),
+    __metadata("design:type", String)
+], WaveformComponent.prototype, "trackIdPrefix", void 0);
+__decorate([
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["w" /* Input */])(),
+    __metadata("design:type", Boolean),
+    __metadata("design:paramtypes", [Boolean])
+], WaveformComponent.prototype, "isSubscribedToExtractionService", null);
+__decorate([
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["w" /* Input */])(),
+    __metadata("design:type", Boolean),
+    __metadata("design:paramtypes", [Boolean])
+], WaveformComponent.prototype, "isSubscribedToAudioService", null);
+__decorate([
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["w" /* Input */])(),
+    __metadata("design:type", Boolean),
+    __metadata("design:paramtypes", [Boolean])
+], WaveformComponent.prototype, "isOneShotExtractor", null);
+__decorate([
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["w" /* Input */])(),
+    __metadata("design:type", Boolean),
+    __metadata("design:paramtypes", [Boolean])
+], WaveformComponent.prototype, "isSeeking", null);
 WaveformComponent = __decorate([
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["Q" /* Component */])({
         selector: 'app-waveform',
@@ -1730,9 +2127,11 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 
 
 let AudioPlayerService = class AudioPlayerService {
-    constructor(audioElement /* TODO probably shouldn't play audio this way */, audioContext) {
+    constructor(audioElement /* TODO probably shouldn't play audio this way */, audioContext, readResource, resourceManager) {
         this.audioElement = audioElement; /* TODO probably shouldn't play audio this way */
         this.audioContext = audioContext;
+        this.readResource = readResource;
+        this.resourceManager = resourceManager;
         this.currentObjectUrl = '';
         this.playingStateChange = new __WEBPACK_IMPORTED_MODULE_1_rxjs_Subject__["Subject"]();
         this.playingStateChange$ = this.playingStateChange.asObservable();
@@ -1744,6 +2143,8 @@ let AudioPlayerService = class AudioPlayerService {
         this.audioElement.addEventListener('seeked', () => {
             this.seeked.next(this.audioElement.currentTime);
         });
+        this.audioLoaded = new __WEBPACK_IMPORTED_MODULE_1_rxjs_Subject__["Subject"]();
+        this.audioLoaded$ = this.audioLoaded.asObservable();
     }
     getCurrentTime() {
         return this.audioElement.currentTime;
@@ -1751,16 +2152,39 @@ let AudioPlayerService = class AudioPlayerService {
     isPlaying() {
         return !this.audioElement.paused;
     }
-    decodeAudioData(buffer) {
-        return new Promise((res, rej) => this.audioContext.decodeAudioData(buffer, res, rej));
-    }
-    loadAudioFromUrl(url) {
+    loadAudio(resource) {
         if (this.currentObjectUrl)
-            URL.revokeObjectURL(this.currentObjectUrl);
+            this.resourceManager.revokeUrlToResource(this.currentObjectUrl);
+        const url = this.resourceManager.createUrlToResource(resource);
         this.currentObjectUrl = url;
         this.audioElement.pause();
         this.audioElement.src = url;
         this.audioElement.load();
+        const decode = buffer => {
+            try {
+                return this.audioContext.decodeAudioData(buffer);
+            }
+            catch (e) {
+                console.warn('Falling back to callback style decodeAudioData');
+                return new Promise((res, rej) => this.audioContext.decodeAudioData(buffer, res, rej));
+            }
+        };
+        this.readResource(resource)
+            .then(decode)
+            .then(val => {
+            this.audioLoaded.next({
+                samples: val,
+                url: url,
+                mimeType: resource.type
+            });
+        })
+            .catch(err => {
+            const message = err && err.message ? err.message : "Read error";
+            this.audioLoaded.next({
+                message: message
+            });
+        });
+        return url;
     }
     togglePlaying() {
         if (this.audioElement.readyState >= 2) {
@@ -1800,10 +2224,19 @@ AudioPlayerService = __decorate([
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["c" /* Injectable */])(),
     __param(0, __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["d" /* Inject */])(HTMLAudioElement)),
     __param(1, __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["d" /* Inject */])('AudioContext')),
-    __metadata("design:paramtypes", [Object, Object])
+    __param(2, __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["d" /* Inject */])('ResourceReader')),
+    __param(3, __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__angular_core__["d" /* Inject */])('UrlResourceLifetimeManager')),
+    __metadata("design:paramtypes", [Object, Object, Function, Object])
 ], AudioPlayerService);
 
 //# sourceMappingURL=/home/cannam/code/ugly-duckling/src/audio-player.service.js.map
+
+/***/ }),
+
+/***/ "vB4/":
+/***/ (function(module, exports) {
+
+module.exports = "\n<template ngFor let-item [ngForOf]=\"analyses\">\n  <div [class.break]=\"item.isRoot\">\n      <ugly-analysis-item\n        [timeline]=\"item.hasSharedTimeline ? sharedTimeline : undefined\"\n        [title]=\"item.title\"\n        [description]=\"item.description\"\n        [isActive]=\"rootAudioUri === item.rootAudioUri\"\n        [isRoot]=\"item.isRoot\"\n        [id]=\"item.id\"></ugly-analysis-item>\n  </div>\n</template>\n"
 
 /***/ }),
 
