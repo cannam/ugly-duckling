@@ -1466,6 +1466,7 @@ let WaveformComponent = class WaveformComponent {
             const zoom = (ev) => {
                 if (ev.touches.length < 2)
                     return;
+                ev.preventDefault();
                 const minZoom = componentTimeline.state.minZoom;
                 const maxZoom = componentTimeline.state.maxZoom;
                 const p1 = {
@@ -1713,8 +1714,8 @@ let WaveformComponent = class WaveformComponent {
         const height = this.trackDiv.nativeElement.getBoundingClientRect().height / 2;
         const gridTrack = this.timeline.getTrackById(`grid-${this.trackIdPrefix}`);
         const spectrogramLayer = new __WEBPACK_IMPORTED_MODULE_6__spectrogram_Spectrogram__["a" /* WavesSpectrogramLayer */](buffer, {
-            top: height * 0.05,
-            height: height * 0.9,
+            top: 0,
+            height: height,
             stepSize: 512,
             blockSize: 1024,
             normalise: 'none',
@@ -1857,8 +1858,8 @@ let WaveformComponent = class WaveformComponent {
                 stepDuration);
                 let matrixLayer = new __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.helpers.MatrixLayer(matrixEntity, {
                     gain,
-                    height: height * 0.9,
-                    top: height * 0.05,
+                    top: 0,
+                    height: height,
                     normalise: 'none',
                     mapper: this.iceMapper()
                 });
