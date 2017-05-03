@@ -1993,10 +1993,18 @@ let WaveformComponent = class WaveformComponent {
                     yDomain: [min, max]
                 });
                 this.addLayer(lineLayer, waveTrack, this.timeline.timeContext);
+                const scaleLayer = new __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.helpers.ScaleLayer({
+                    tickColor: colour,
+                    textColor: colour,
+                    height: height,
+                    yDomain: [min, max]
+                });
+                this.addLayer(scaleLayer, waveTrack, this.timeline.timeContext);
                 this.highlightLayer = new __WEBPACK_IMPORTED_MODULE_2_waves_ui___default.a.helpers.HighlightLayer(lineLayer, {
                     opacity: 0.7,
                     height: height,
                     color: '#c33c54',
+                    labelOffset: 38,
                     yDomain: [min, max]
                 });
                 this.addLayer(this.highlightLayer, waveTrack, this.timeline.timeContext);

@@ -469,32 +469,30 @@ var WebSocketSubject = (function (_super) {
      *
      * @example <caption>Wraps browser WebSocket</caption>
      *
-     * let socket$ = Observable.webSocket('ws://localhost:8081');
-     *
-     * socket$.subscribe(
+     * let subject = Observable.webSocket('ws://localhost:8081');
+     * subject.subscribe(
      *    (msg) => console.log('message received: ' + msg),
      *    (err) => console.log(err),
      *    () => console.log('complete')
      *  );
-     *
-     * socket$.next(JSON.stringify({ op: 'hello' }));
+     * subject.next(JSON.stringify({ op: 'hello' }));
      *
      * @example <caption>Wraps WebSocket from nodejs-websocket (using node.js)</caption>
      *
      * import { w3cwebsocket } from 'websocket';
      *
-     * let socket$ = Observable.webSocket({
+     * let socket = new WebSocketSubject({
      *   url: 'ws://localhost:8081',
      *   WebSocketCtor: w3cwebsocket
      * });
      *
-     * socket$.subscribe(
+     * let subject = Observable.webSocket('ws://localhost:8081');
+     * subject.subscribe(
      *    (msg) => console.log('message received: ' + msg),
      *    (err) => console.log(err),
      *    () => console.log('complete')
      *  );
-     *
-     * socket$.next(JSON.stringify({ op: 'hello' }));
+     * subject.next(JSON.stringify({ op: 'hello' }));
      *
      * @param {string | WebSocketSubjectConfig} urlConfigOrSource the source of the websocket as an url or a structure defining the websocket object
      * @return {WebSocketSubject}
@@ -1458,7 +1456,7 @@ var BoundCallbackObservable = (function (_super) {
      * });
      *
      * const boundSomeFunction = Rx.Observable.bindCallback(someFunction);
-     * boundSomeFunction().subscribe(values => {
+     * boundSomeFunction.subscribe(values => {
      *   console.log(values) // [5, 'some string', {someProperty: 'someValue'}]
      * });
      *
@@ -1471,7 +1469,7 @@ var BoundCallbackObservable = (function (_super) {
      * });
      *
      * const boundSomeFunction = Rx.Observable.bindCallback(someFunction, (a, b, c) => a + b + c);
-     * boundSomeFunction().subscribe(value => {
+     * boundSomeFunction.subscribe(value => {
      *   console.log(value) // 'abc'
      * });
      *
@@ -3815,43 +3813,67 @@ var TimeoutWithOperator = (function () {
 var TimeoutWithSubscriber = (function (_super) {
     __extends(TimeoutWithSubscriber, _super);
     function TimeoutWithSubscriber(destination, absoluteTimeout, waitFor, withObservable, scheduler) {
-        _super.call(this, destination);
+        _super.call(this);
+        this.destination = destination;
         this.absoluteTimeout = absoluteTimeout;
         this.waitFor = waitFor;
         this.withObservable = withObservable;
         this.scheduler = scheduler;
-        this.action = null;
+        this.timeoutSubscription = undefined;
+        this.index = 0;
+        this._previousIndex = 0;
+        this._hasCompleted = false;
+        destination.add(this);
         this.scheduleTimeout();
     }
-    TimeoutWithSubscriber.dispatchTimeout = function (subscriber) {
-        var withObservable = subscriber.withObservable;
-        subscriber._unsubscribeAndRecycle();
-        subscriber.add(subscribeToResult_1.subscribeToResult(subscriber, withObservable));
+    Object.defineProperty(TimeoutWithSubscriber.prototype, "previousIndex", {
+        get: function () {
+            return this._previousIndex;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(TimeoutWithSubscriber.prototype, "hasCompleted", {
+        get: function () {
+            return this._hasCompleted;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    TimeoutWithSubscriber.dispatchTimeout = function (state) {
+        var source = state.subscriber;
+        var currentIndex = state.index;
+        if (!source.hasCompleted && source.previousIndex === currentIndex) {
+            source.handleTimeout();
+        }
     };
     TimeoutWithSubscriber.prototype.scheduleTimeout = function () {
-        var action = this.action;
-        if (action) {
-            // Recycle the action if we've already scheduled one. All the production
-            // Scheduler Actions mutate their state/delay time and return themeselves.
-            // VirtualActions are immutable, so they create and return a clone. In this
-            // case, we need to set the action reference to the most recent VirtualAction,
-            // to ensure that's the one we clone from next time.
-            this.action = action.schedule(this, this.waitFor);
-        }
-        else {
-            this.add(this.action = this.scheduler.schedule(TimeoutWithSubscriber.dispatchTimeout, this.waitFor, this));
-        }
+        var currentIndex = this.index;
+        var timeoutState = { subscriber: this, index: currentIndex };
+        this.scheduler.schedule(TimeoutWithSubscriber.dispatchTimeout, this.waitFor, timeoutState);
+        this.index++;
+        this._previousIndex = currentIndex;
     };
     TimeoutWithSubscriber.prototype._next = function (value) {
+        this.destination.next(value);
         if (!this.absoluteTimeout) {
             this.scheduleTimeout();
         }
-        _super.prototype._next.call(this, value);
     };
-    TimeoutWithSubscriber.prototype._unsubscribe = function () {
-        this.action = null;
-        this.scheduler = null;
-        this.withObservable = null;
+    TimeoutWithSubscriber.prototype._error = function (err) {
+        this.destination.error(err);
+        this._hasCompleted = true;
+    };
+    TimeoutWithSubscriber.prototype._complete = function () {
+        this.destination.complete();
+        this._hasCompleted = true;
+    };
+    TimeoutWithSubscriber.prototype.handleTimeout = function () {
+        if (!this.closed) {
+            var withObservable = this.withObservable;
+            this.unsubscribe();
+            this.destination.add(this.timeoutSubscription = subscribeToResult_1.subscribeToResult(this, withObservable));
+        }
     };
     return TimeoutWithSubscriber;
 }(OuterSubscriber_1.OuterSubscriber));
@@ -5579,8 +5601,8 @@ function subscribeToResult(outerSubscriber, result, outerValue, outerIndex) {
         });
         return destination;
     }
-    else if (result && typeof result[iterator_1.iterator] === 'function') {
-        var iterator = result[iterator_1.iterator]();
+    else if (result && typeof result[iterator_1.$$iterator] === 'function') {
+        var iterator = result[iterator_1.$$iterator]();
         do {
             var item = iterator.next();
             if (item.done) {
@@ -5593,8 +5615,8 @@ function subscribeToResult(outerSubscriber, result, outerValue, outerIndex) {
             }
         } while (true);
     }
-    else if (result && typeof result[observable_1.observable] === 'function') {
-        var obs = result[observable_1.observable]();
+    else if (result && typeof result[observable_1.$$observable] === 'function') {
+        var obs = result[observable_1.$$observable]();
         if (typeof obs.subscribe !== 'function') {
             destination.error(new TypeError('Provided object does not correctly implement Symbol.observable'));
         }
@@ -6670,36 +6692,54 @@ var TimeoutSubscriber = (function (_super) {
         this.waitFor = waitFor;
         this.scheduler = scheduler;
         this.errorInstance = errorInstance;
-        this.action = null;
+        this.index = 0;
+        this._previousIndex = 0;
+        this._hasCompleted = false;
         this.scheduleTimeout();
     }
-    TimeoutSubscriber.dispatchTimeout = function (subscriber) {
-        subscriber.error(subscriber.errorInstance);
+    Object.defineProperty(TimeoutSubscriber.prototype, "previousIndex", {
+        get: function () {
+            return this._previousIndex;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(TimeoutSubscriber.prototype, "hasCompleted", {
+        get: function () {
+            return this._hasCompleted;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    TimeoutSubscriber.dispatchTimeout = function (state) {
+        var source = state.subscriber;
+        var currentIndex = state.index;
+        if (!source.hasCompleted && source.previousIndex === currentIndex) {
+            source.notifyTimeout();
+        }
     };
     TimeoutSubscriber.prototype.scheduleTimeout = function () {
-        var action = this.action;
-        if (action) {
-            // Recycle the action if we've already scheduled one. All the production
-            // Scheduler Actions mutate their state/delay time and return themeselves.
-            // VirtualActions are immutable, so they create and return a clone. In this
-            // case, we need to set the action reference to the most recent VirtualAction,
-            // to ensure that's the one we clone from next time.
-            this.action = action.schedule(this, this.waitFor);
-        }
-        else {
-            this.add(this.action = this.scheduler.schedule(TimeoutSubscriber.dispatchTimeout, this.waitFor, this));
-        }
+        var currentIndex = this.index;
+        this.scheduler.schedule(TimeoutSubscriber.dispatchTimeout, this.waitFor, { subscriber: this, index: currentIndex });
+        this.index++;
+        this._previousIndex = currentIndex;
     };
     TimeoutSubscriber.prototype._next = function (value) {
+        this.destination.next(value);
         if (!this.absoluteTimeout) {
             this.scheduleTimeout();
         }
-        _super.prototype._next.call(this, value);
     };
-    TimeoutSubscriber.prototype._unsubscribe = function () {
-        this.action = null;
-        this.scheduler = null;
-        this.errorInstance = null;
+    TimeoutSubscriber.prototype._error = function (err) {
+        this.destination.error(err);
+        this._hasCompleted = true;
+    };
+    TimeoutSubscriber.prototype._complete = function () {
+        this.destination.complete();
+        this._hasCompleted = true;
+    };
+    TimeoutSubscriber.prototype.notifyTimeout = function () {
+        this.error(this.errorInstance);
     };
     return TimeoutSubscriber;
 }(Subscriber_1.Subscriber));
@@ -6760,7 +6800,7 @@ var Subject = (function (_super) {
         this.hasError = false;
         this.thrownError = null;
     }
-    Subject.prototype[rxSubscriber_1.rxSubscriber] = function () {
+    Subject.prototype[rxSubscriber_1.$$rxSubscriber] = function () {
         return new SubjectSubscriber(this);
     };
     Subject.prototype.lift = function (operator) {
@@ -7897,9 +7937,9 @@ exports.Scheduler = Scheduler;
  * to retrieve an iterator from an object.
  */
 var Symbol = {
-    rxSubscriber: rxSubscriber_1.rxSubscriber,
-    observable: observable_1.observable,
-    iterator: iterator_1.iterator
+    rxSubscriber: rxSubscriber_1.$$rxSubscriber,
+    observable: observable_1.$$observable,
+    iterator: iterator_1.$$iterator
 };
 exports.Symbol = Symbol;
 //# sourceMappingURL=Rx.js.map
@@ -8546,7 +8586,7 @@ var FromObservable = (function (_super) {
      */
     FromObservable.create = function (ish, scheduler) {
         if (ish != null) {
-            if (typeof ish[observable_1.observable] === 'function') {
+            if (typeof ish[observable_1.$$observable] === 'function') {
                 if (ish instanceof Observable_1.Observable && !scheduler) {
                     return ish;
                 }
@@ -8558,7 +8598,7 @@ var FromObservable = (function (_super) {
             else if (isPromise_1.isPromise(ish)) {
                 return new PromiseObservable_1.PromiseObservable(ish, scheduler);
             }
-            else if (typeof ish[iterator_1.iterator] === 'function' || typeof ish === 'string') {
+            else if (typeof ish[iterator_1.$$iterator] === 'function' || typeof ish === 'string') {
                 return new IteratorObservable_1.IteratorObservable(ish, scheduler);
             }
             else if (isArrayLike_1.isArrayLike(ish)) {
@@ -8571,10 +8611,10 @@ var FromObservable = (function (_super) {
         var ish = this.ish;
         var scheduler = this.scheduler;
         if (scheduler == null) {
-            return ish[observable_1.observable]().subscribe(subscriber);
+            return ish[observable_1.$$observable]().subscribe(subscriber);
         }
         else {
-            return ish[observable_1.observable]().subscribe(new observeOn_1.ObserveOnSubscriber(subscriber, scheduler, 0));
+            return ish[observable_1.$$observable]().subscribe(new observeOn_1.ObserveOnSubscriber(subscriber, scheduler, 0));
         }
     };
     return FromObservable;
@@ -9663,15 +9703,9 @@ var BufferCountOperator = (function () {
     function BufferCountOperator(bufferSize, startBufferEvery) {
         this.bufferSize = bufferSize;
         this.startBufferEvery = startBufferEvery;
-        if (!startBufferEvery || bufferSize === startBufferEvery) {
-            this.subscriberClass = BufferCountSubscriber;
-        }
-        else {
-            this.subscriberClass = BufferSkipCountSubscriber;
-        }
     }
     BufferCountOperator.prototype.call = function (subscriber, source) {
-        return source.subscribe(new this.subscriberClass(subscriber, this.bufferSize, this.startBufferEvery));
+        return source.subscribe(new BufferCountSubscriber(subscriber, this.bufferSize, this.startBufferEvery));
     };
     return BufferCountOperator;
 }());
@@ -9682,46 +9716,18 @@ var BufferCountOperator = (function () {
  */
 var BufferCountSubscriber = (function (_super) {
     __extends(BufferCountSubscriber, _super);
-    function BufferCountSubscriber(destination, bufferSize) {
-        _super.call(this, destination);
-        this.bufferSize = bufferSize;
-        this.buffer = [];
-    }
-    BufferCountSubscriber.prototype._next = function (value) {
-        var buffer = this.buffer;
-        buffer.push(value);
-        if (buffer.length == this.bufferSize) {
-            this.destination.next(buffer);
-            this.buffer = [];
-        }
-    };
-    BufferCountSubscriber.prototype._complete = function () {
-        var buffer = this.buffer;
-        if (buffer.length > 0) {
-            this.destination.next(buffer);
-        }
-        _super.prototype._complete.call(this);
-    };
-    return BufferCountSubscriber;
-}(Subscriber_1.Subscriber));
-/**
- * We need this JSDoc comment for affecting ESDoc.
- * @ignore
- * @extends {Ignored}
- */
-var BufferSkipCountSubscriber = (function (_super) {
-    __extends(BufferSkipCountSubscriber, _super);
-    function BufferSkipCountSubscriber(destination, bufferSize, startBufferEvery) {
+    function BufferCountSubscriber(destination, bufferSize, startBufferEvery) {
         _super.call(this, destination);
         this.bufferSize = bufferSize;
         this.startBufferEvery = startBufferEvery;
         this.buffers = [];
         this.count = 0;
     }
-    BufferSkipCountSubscriber.prototype._next = function (value) {
-        var _a = this, bufferSize = _a.bufferSize, startBufferEvery = _a.startBufferEvery, buffers = _a.buffers, count = _a.count;
-        this.count++;
-        if (count % startBufferEvery === 0) {
+    BufferCountSubscriber.prototype._next = function (value) {
+        var count = this.count++;
+        var _a = this, destination = _a.destination, bufferSize = _a.bufferSize, startBufferEvery = _a.startBufferEvery, buffers = _a.buffers;
+        var startOn = (startBufferEvery == null) ? bufferSize : startBufferEvery;
+        if (count % startOn === 0) {
             buffers.push([]);
         }
         for (var i = buffers.length; i--;) {
@@ -9729,12 +9735,13 @@ var BufferSkipCountSubscriber = (function (_super) {
             buffer.push(value);
             if (buffer.length === bufferSize) {
                 buffers.splice(i, 1);
-                this.destination.next(buffer);
+                destination.next(buffer);
             }
         }
     };
-    BufferSkipCountSubscriber.prototype._complete = function () {
-        var _a = this, buffers = _a.buffers, destination = _a.destination;
+    BufferCountSubscriber.prototype._complete = function () {
+        var destination = this.destination;
+        var buffers = this.buffers;
         while (buffers.length > 0) {
             var buffer = buffers.shift();
             if (buffer.length > 0) {
@@ -9743,7 +9750,7 @@ var BufferSkipCountSubscriber = (function (_super) {
         }
         _super.prototype._complete.call(this);
     };
-    return BufferSkipCountSubscriber;
+    return BufferCountSubscriber;
 }(Subscriber_1.Subscriber));
 //# sourceMappingURL=bufferCount.js.map
 
@@ -10829,8 +10836,8 @@ var ZipSubscriber = (function (_super) {
         if (isArray_1.isArray(value)) {
             iterators.push(new StaticArrayIterator(value));
         }
-        else if (typeof value[iterator_1.iterator] === 'function') {
-            iterators.push(new StaticIterator(value[iterator_1.iterator]()));
+        else if (typeof value[iterator_1.$$iterator] === 'function') {
+            iterators.push(new StaticIterator(value[iterator_1.$$iterator]()));
         }
         else {
             iterators.push(new ZipBufferIterator(this.destination, this, value));
@@ -10839,10 +10846,6 @@ var ZipSubscriber = (function (_super) {
     ZipSubscriber.prototype._complete = function () {
         var iterators = this.iterators;
         var len = iterators.length;
-        if (len === 0) {
-            this.destination.complete();
-            return;
-        }
         this.active = len;
         for (var i = 0; i < len; i++) {
             var iterator = iterators[i];
@@ -10937,7 +10940,7 @@ var StaticArrayIterator = (function () {
         this.length = 0;
         this.length = array.length;
     }
-    StaticArrayIterator.prototype[iterator_1.iterator] = function () {
+    StaticArrayIterator.prototype[iterator_1.$$iterator] = function () {
         return this;
     };
     StaticArrayIterator.prototype.next = function (value) {
@@ -10968,7 +10971,7 @@ var ZipBufferIterator = (function (_super) {
         this.buffer = [];
         this.isComplete = false;
     }
-    ZipBufferIterator.prototype[iterator_1.iterator] = function () {
+    ZipBufferIterator.prototype[iterator_1.$$iterator] = function () {
         return this;
     };
     // NOTE: there is actually a name collision here with Subscriber.next and Iterator.next
@@ -11680,7 +11683,7 @@ var StringIterator = (function () {
         this.idx = idx;
         this.len = len;
     }
-    StringIterator.prototype[iterator_1.iterator] = function () { return (this); };
+    StringIterator.prototype[iterator_1.$$iterator] = function () { return (this); };
     StringIterator.prototype.next = function () {
         return this.idx < this.len ? {
             done: false,
@@ -11700,7 +11703,7 @@ var ArrayIterator = (function () {
         this.idx = idx;
         this.len = len;
     }
-    ArrayIterator.prototype[iterator_1.iterator] = function () { return this; };
+    ArrayIterator.prototype[iterator_1.$$iterator] = function () { return this; };
     ArrayIterator.prototype.next = function () {
         return this.idx < this.len ? {
             done: false,
@@ -11713,7 +11716,7 @@ var ArrayIterator = (function () {
     return ArrayIterator;
 }());
 function getIterator(obj) {
-    var i = obj[iterator_1.iterator];
+    var i = obj[iterator_1.$$iterator];
     if (!i && typeof obj === 'string') {
         return new StringIterator(obj);
     }
@@ -11723,7 +11726,7 @@ function getIterator(obj) {
     if (!i) {
         throw new TypeError('object is not iterable');
     }
-    return obj[iterator_1.iterator]();
+    return obj[iterator_1.$$iterator]();
 }
 var maxSafeInteger = Math.pow(2, 53) - 1;
 function toLength(o) {
@@ -12871,10 +12874,6 @@ process.off = noop;
 process.removeListener = noop;
 process.removeAllListeners = noop;
 process.emit = noop;
-process.prependListener = noop;
-process.prependOnceListener = noop;
-
-process.listeners = function (name) { return [] }
 
 process.binding = function (name) {
     throw new Error('process.binding is not supported');
@@ -14986,52 +14985,6 @@ var FastMap_1 = __webpack_require__("1kxm");
  *
  * <img src="./img/groupBy.png" width="100%">
  *
- * @example <caption>Group objects by id and return as array</caption>
- * Observable.of<Obj>({id: 1, name: 'aze1'},
- *                    {id: 2, name: 'sf2'},
- *                    {id: 2, name: 'dg2'},
- *                    {id: 1, name: 'erg1'},
- *                    {id: 1, name: 'df1'},
- *                    {id: 2, name: 'sfqfb2'},
- *                    {id: 3, name: 'qfs3'},
- *                    {id: 2, name: 'qsgqsfg2'}
- *     )
- *     .groupBy(p => p.id)
- *     .flatMap( (group$) => group$.reduce((acc, cur) => [...acc, cur], []))
- *     .subscribe(p => console.log(p));
- *
- * // displays:
- * // [ { id: 1, name: 'aze1' },
- * //   { id: 1, name: 'erg1' },
- * //   { id: 1, name: 'df1' } ]
- * //
- * // [ { id: 2, name: 'sf2' },
- * //   { id: 2, name: 'dg2' },
- * //   { id: 2, name: 'sfqfb2' },
- * //   { id: 2, name: 'qsgqsfg2' } ]
- * //
- * // [ { id: 3, name: 'qfs3' } ]
- *
- * @example <caption>Pivot data on the id field</caption>
- * Observable.of<Obj>({id: 1, name: 'aze1'},
- *                    {id: 2, name: 'sf2'},
- *                    {id: 2, name: 'dg2'},
- *                    {id: 1, name: 'erg1'},
- *                    {id: 1, name: 'df1'},
- *                    {id: 2, name: 'sfqfb2'},
- *                    {id: 3, name: 'qfs1'},
- *                    {id: 2, name: 'qsgqsfg2'}
- *                   )
- *     .groupBy(p => p.id, p => p.anme)
- *     .flatMap( (group$) => group$.reduce((acc, cur) => [...acc, cur], ["" + group$.key]))
- *     .map(arr => ({'id': parseInt(arr[0]), 'values': arr.slice(1)}))
- *     .subscribe(p => console.log(p));
- *
- * // displays:
- * // { id: 1, values: [ 'aze1', 'erg1', 'df1' ] }
- * // { id: 2, values: [ 'sf2', 'dg2', 'sfqfb2', 'qsgqsfg2' ] }
- * // { id: 3, values: [ 'qfs1' ] }
- *
  * @param {function(value: T): K} keySelector A function that extracts the key
  * for each item.
  * @param {function(value: T): R} [elementSelector] A function that extracts the
@@ -15460,11 +15413,7 @@ function symbolIteratorPonyfill(root) {
     }
 }
 exports.symbolIteratorPonyfill = symbolIteratorPonyfill;
-exports.iterator = symbolIteratorPonyfill(root_1.root);
-/**
- * @deprecated use iterator instead
- */
-exports.$$iterator = exports.iterator;
+exports.$$iterator = symbolIteratorPonyfill(root_1.root);
 //# sourceMappingURL=iterator.js.map
 
 /***/ }),
@@ -17923,8 +17872,8 @@ function toSubscriber(nextOrObserver, error, complete) {
         if (nextOrObserver instanceof Subscriber_1.Subscriber) {
             return nextOrObserver;
         }
-        if (nextOrObserver[rxSubscriber_1.rxSubscriber]) {
-            return nextOrObserver[rxSubscriber_1.rxSubscriber]();
+        if (nextOrObserver[rxSubscriber_1.$$rxSubscriber]) {
+            return nextOrObserver[rxSubscriber_1.$$rxSubscriber]();
         }
     }
     if (!nextOrObserver && !error && !complete) {
@@ -18064,11 +18013,7 @@ function getSymbolObservable(context) {
     return $$observable;
 }
 exports.getSymbolObservable = getSymbolObservable;
-exports.observable = getSymbolObservable(root_1.root);
-/**
- * @deprecated use observable instead
- */
-exports.$$observable = exports.observable;
+exports.$$observable = getSymbolObservable(root_1.root);
 //# sourceMappingURL=observable.js.map
 
 /***/ }),
@@ -18139,7 +18084,7 @@ var Subscriber = (function (_super) {
                 break;
         }
     }
-    Subscriber.prototype[rxSubscriber_1.rxSubscriber] = function () { return this; };
+    Subscriber.prototype[rxSubscriber_1.$$rxSubscriber] = function () { return this; };
     /**
      * A static factory for a Subscriber, given a (potentially partial) definition
      * of an Observer.
@@ -18241,16 +18186,14 @@ var SafeSubscriber = (function (_super) {
             next = observerOrNext;
         }
         else if (observerOrNext) {
+            context = observerOrNext;
             next = observerOrNext.next;
             error = observerOrNext.error;
             complete = observerOrNext.complete;
-            if (observerOrNext !== Observer_1.empty) {
-                context = Object.create(observerOrNext);
-                if (isFunction_1.isFunction(context.unsubscribe)) {
-                    this.add(context.unsubscribe.bind(context));
-                }
-                context.unsubscribe = this.unsubscribe.bind(this);
+            if (isFunction_1.isFunction(context.unsubscribe)) {
+                this.add(context.unsubscribe.bind(context));
             }
+            context.unsubscribe = this.unsubscribe.bind(this);
         }
         this._context = context;
         this._next = next;
@@ -19329,7 +19272,6 @@ var VirtualAction = (function (_super) {
         this.scheduler = scheduler;
         this.work = work;
         this.index = index;
-        this.active = true;
         this.index = scheduler.index = index;
     }
     VirtualAction.prototype.schedule = function (state, delay) {
@@ -19337,7 +19279,6 @@ var VirtualAction = (function (_super) {
         if (!this.id) {
             return _super.prototype.schedule.call(this, state, delay);
         }
-        this.active = false;
         // If an action is rescheduled, we save allocations by mutating its state,
         // pushing it to the end of the scheduler queue, and recycling the action.
         // But since the VirtualTimeScheduler is used for testing, VirtualActions
@@ -19357,11 +19298,6 @@ var VirtualAction = (function (_super) {
     VirtualAction.prototype.recycleAsyncId = function (scheduler, id, delay) {
         if (delay === void 0) { delay = 0; }
         return undefined;
-    };
-    VirtualAction.prototype._execute = function (state, delay) {
-        if (this.active === true) {
-            return _super.prototype._execute.call(this, state, delay);
-        }
     };
     VirtualAction.sortActions = function (a, b) {
         if (a.delay === b.delay) {
@@ -19456,12 +19392,8 @@ Observable_1.Observable.prototype.combineLatest = combineLatest_1.combineLatest;
 
 var root_1 = __webpack_require__("VOfZ");
 var Symbol = root_1.root.Symbol;
-exports.rxSubscriber = (typeof Symbol === 'function' && typeof Symbol.for === 'function') ?
+exports.$$rxSubscriber = (typeof Symbol === 'function' && typeof Symbol.for === 'function') ?
     Symbol.for('rxSubscriber') : '@@rxSubscriber';
-/**
- * @deprecated use rxSubscriber instead
- */
-exports.$$rxSubscriber = exports.rxSubscriber;
 //# sourceMappingURL=rxSubscriber.js.map
 
 /***/ }),
@@ -19555,10 +19487,7 @@ var Observable = (function () {
             throw new Error('no Promise impl found');
         }
         return new PromiseCtor(function (resolve, reject) {
-            // Must be declared in a separate statement to avoid a RefernceError when
-            // accessing subscription below in the closure due to Temporal Dead Zone.
-            var subscription;
-            subscription = _this.subscribe(function (value) {
+            var subscription = _this.subscribe(function (value) {
                 if (subscription) {
                     // if there is a subscription, then we can surmise
                     // the next handling is asynchronous. Any errors thrown
@@ -19592,7 +19521,7 @@ var Observable = (function () {
      * @method Symbol.observable
      * @return {Observable} this instance of the observable
      */
-    Observable.prototype[observable_1.observable] = function () {
+    Observable.prototype[observable_1.$$observable] = function () {
         return this;
     };
     // HACK: Since TypeScript inherits static properties too, we have to
@@ -19709,8 +19638,6 @@ exports.ConnectableObservable = ConnectableObservable;
 exports.connectableObservableDescriptor = {
     operator: { value: null },
     _refCount: { value: 0, writable: true },
-    _subject: { value: null, writable: true },
-    _connection: { value: null, writable: true },
     _subscribe: { value: ConnectableObservable.prototype._subscribe },
     getSubject: { value: ConnectableObservable.prototype.getSubject },
     connect: { value: ConnectableObservable.prototype.connect },
