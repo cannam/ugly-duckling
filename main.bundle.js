@@ -701,7 +701,7 @@ UglyMaterialModule = __decorate([
 /***/ "W1+o":
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"container\">\n  <md-select #extractorSelect\n    placeholder=\"Extractors\">\n    <md-option\n      *ngFor=\"let extractor of extractors\"\n      [value]=\"extractor.combinedKey\"\n    >\n      {{extractor.name}}\n    </md-option>\n  </md-select>\n  <p>\n    <button md-raised-button\n            color=\"primary\"\n            (click)=\"extract(extractorSelect.selected.value)\"\n            [disabled]=\"disabled\">Extract</button>\n  </p>\n  <p>\n    <button md-raised-button\n            (click)=\"load()\">Load Remote Plugins</button>\n  </p>\n</div>\n"
+module.exports = "<div class=\"container\">\n  <md-select #extractorSelect\n    placeholder=\"Extractors\">\n    <md-option\n      *ngFor=\"let extractor of extractors\"\n      [value]=\"extractor.combinedKey\"\n    >\n      {{extractor.name}}\n    </md-option>\n  </md-select>\n  <p>\n    <button md-raised-button\n            color=\"primary\"\n            (click)=\"extract(getFirstSelectedItemOrEmpty(extractorSelect))\"\n            [disabled]=\"disabled\">Extract</button>\n  </p>\n  <p>\n    <button md-raised-button\n            (click)=\"load()\">Load Remote Plugins</button>\n  </p>\n</div>\n"
 
 /***/ }),
 
@@ -980,7 +980,7 @@ exports = module.exports = __webpack_require__("FZ+f")(false);
 
 
 // module
-exports.push([module.i, "md-card{padding-left:0;padding-right:0;width:100%}md-card-actions{width:calc(100% - 16px);padding-left:16px}md-card-header{margin-bottom:8px}", ""]);
+exports.push([module.i, "md-card{padding-left:0;padding-right:0;width:100%;padding-bottom:0}md-card-actions{width:calc(100% - 16px);padding-left:16px}md-card-header{margin-bottom:8px}", ""]);
 
 // exports
 
@@ -1450,21 +1450,21 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 
 
 
-const colours = function* () {
-    const circularColours = [
-        '#0868ac',
-        '#c33c54',
-        '#17bebb',
-        '#001021',
-        '#fa8334',
-        '#034748' // "deep jungle green"
-    ];
+function* createColourGenerator(colours) {
     let index = 0;
-    const nColours = circularColours.length;
+    const nColours = colours.length;
     while (true) {
-        yield circularColours[index = ++index % nColours];
+        yield colours[index = ++index % nColours];
     }
-}();
+}
+const defaultColourGenerator = createColourGenerator([
+    '#0868ac',
+    '#c33c54',
+    '#17bebb',
+    '#001021',
+    '#fa8334',
+    '#034748' // "deep jungle green"
+]);
 let WaveformComponent = class WaveformComponent {
     constructor(audioService, piperService, ngZone, ref) {
         this.audioService = audioService;
@@ -1488,7 +1488,7 @@ let WaveformComponent = class WaveformComponent {
             }
             this.featureExtractionSubscription =
                 this.piperService.featuresExtracted$.subscribe(features => {
-                    this.renderFeatures(features, colours.next().value);
+                    this.renderFeatures(features, defaultColourGenerator.next().value);
                 });
         }
         else {
@@ -2308,6 +2308,13 @@ let FeatureExtractionMenuComponent = class FeatureExtractionMenuComponent {
     }
     get disabled() {
         return this.isDisabled;
+    }
+    getFirstSelectedItemOrEmpty(select) {
+        const selected = select.selected;
+        if (selected) {
+            return selected instanceof Array ? selected[0].value : selected.value;
+        }
+        return '';
     }
     ngOnInit() {
         this.piperService.list().then(this.populateExtractors);
