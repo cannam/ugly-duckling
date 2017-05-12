@@ -469,30 +469,32 @@ var WebSocketSubject = (function (_super) {
      *
      * @example <caption>Wraps browser WebSocket</caption>
      *
-     * let subject = Observable.webSocket('ws://localhost:8081');
-     * subject.subscribe(
+     * let socket$ = Observable.webSocket('ws://localhost:8081');
+     *
+     * socket$.subscribe(
      *    (msg) => console.log('message received: ' + msg),
      *    (err) => console.log(err),
      *    () => console.log('complete')
      *  );
-     * subject.next(JSON.stringify({ op: 'hello' }));
+     *
+     * socket$.next(JSON.stringify({ op: 'hello' }));
      *
      * @example <caption>Wraps WebSocket from nodejs-websocket (using node.js)</caption>
      *
      * import { w3cwebsocket } from 'websocket';
      *
-     * let socket = new WebSocketSubject({
+     * let socket$ = Observable.webSocket({
      *   url: 'ws://localhost:8081',
      *   WebSocketCtor: w3cwebsocket
      * });
      *
-     * let subject = Observable.webSocket('ws://localhost:8081');
-     * subject.subscribe(
+     * socket$.subscribe(
      *    (msg) => console.log('message received: ' + msg),
      *    (err) => console.log(err),
      *    () => console.log('complete')
      *  );
-     * subject.next(JSON.stringify({ op: 'hello' }));
+     *
+     * socket$.next(JSON.stringify({ op: 'hello' }));
      *
      * @param {string | WebSocketSubjectConfig} urlConfigOrSource the source of the websocket as an url or a structure defining the websocket object
      * @return {WebSocketSubject}
@@ -882,9 +884,6 @@ class AggregateStreamingService {
     process(request) {
         return this.dispatch('process', request);
     }
-    collect(request) {
-        return this.dispatch('collect', request);
-    }
     dispatch(method, request) {
         const key = request.key.split(':')[0];
         return this.services.has(key) ?
@@ -897,15 +896,23 @@ class ThrottledReducingAggregateService extends AggregateStreamingService {
     }
     dispatch(method, request) {
         let lastPercentagePoint = 0;
+        let shouldClear = false;
         return super.dispatch(method, request)
-            .scan(__WEBPACK_IMPORTED_MODULE_5__FeatureReducers__["a" /* streamingResponseReducer */])
+            .scan((acc, value) => {
+            if (shouldClear) {
+                acc.features = [];
+            }
+            return __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_5__FeatureReducers__["a" /* streamingResponseReducer */])(acc, value);
+        })
             .filter(val => {
-            const percentage = 100 * (val.processedBlockCount / val.totalBlockCount) | 0;
+            const progress = val.progress;
+            const percentage = 100 * (progress.processedBlockCount / progress.totalBlockCount) | 0;
             const pointDifference = (percentage - lastPercentagePoint);
             const shouldEmit = pointDifference === 1 || percentage === 100;
             if (shouldEmit) {
                 lastPercentagePoint = percentage;
             }
+            shouldClear = shouldEmit;
             return shouldEmit;
         });
     }
@@ -1456,7 +1463,7 @@ var BoundCallbackObservable = (function (_super) {
      * });
      *
      * const boundSomeFunction = Rx.Observable.bindCallback(someFunction);
-     * boundSomeFunction.subscribe(values => {
+     * boundSomeFunction().subscribe(values => {
      *   console.log(values) // [5, 'some string', {someProperty: 'someValue'}]
      * });
      *
@@ -1469,7 +1476,7 @@ var BoundCallbackObservable = (function (_super) {
      * });
      *
      * const boundSomeFunction = Rx.Observable.bindCallback(someFunction, (a, b, c) => a + b + c);
-     * boundSomeFunction.subscribe(value => {
+     * boundSomeFunction().subscribe(value => {
      *   console.log(value) // 'abc'
      * });
      *
@@ -3813,67 +3820,43 @@ var TimeoutWithOperator = (function () {
 var TimeoutWithSubscriber = (function (_super) {
     __extends(TimeoutWithSubscriber, _super);
     function TimeoutWithSubscriber(destination, absoluteTimeout, waitFor, withObservable, scheduler) {
-        _super.call(this);
-        this.destination = destination;
+        _super.call(this, destination);
         this.absoluteTimeout = absoluteTimeout;
         this.waitFor = waitFor;
         this.withObservable = withObservable;
         this.scheduler = scheduler;
-        this.timeoutSubscription = undefined;
-        this.index = 0;
-        this._previousIndex = 0;
-        this._hasCompleted = false;
-        destination.add(this);
+        this.action = null;
         this.scheduleTimeout();
     }
-    Object.defineProperty(TimeoutWithSubscriber.prototype, "previousIndex", {
-        get: function () {
-            return this._previousIndex;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(TimeoutWithSubscriber.prototype, "hasCompleted", {
-        get: function () {
-            return this._hasCompleted;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    TimeoutWithSubscriber.dispatchTimeout = function (state) {
-        var source = state.subscriber;
-        var currentIndex = state.index;
-        if (!source.hasCompleted && source.previousIndex === currentIndex) {
-            source.handleTimeout();
-        }
+    TimeoutWithSubscriber.dispatchTimeout = function (subscriber) {
+        var withObservable = subscriber.withObservable;
+        subscriber._unsubscribeAndRecycle();
+        subscriber.add(subscribeToResult_1.subscribeToResult(subscriber, withObservable));
     };
     TimeoutWithSubscriber.prototype.scheduleTimeout = function () {
-        var currentIndex = this.index;
-        var timeoutState = { subscriber: this, index: currentIndex };
-        this.scheduler.schedule(TimeoutWithSubscriber.dispatchTimeout, this.waitFor, timeoutState);
-        this.index++;
-        this._previousIndex = currentIndex;
+        var action = this.action;
+        if (action) {
+            // Recycle the action if we've already scheduled one. All the production
+            // Scheduler Actions mutate their state/delay time and return themeselves.
+            // VirtualActions are immutable, so they create and return a clone. In this
+            // case, we need to set the action reference to the most recent VirtualAction,
+            // to ensure that's the one we clone from next time.
+            this.action = action.schedule(this, this.waitFor);
+        }
+        else {
+            this.add(this.action = this.scheduler.schedule(TimeoutWithSubscriber.dispatchTimeout, this.waitFor, this));
+        }
     };
     TimeoutWithSubscriber.prototype._next = function (value) {
-        this.destination.next(value);
         if (!this.absoluteTimeout) {
             this.scheduleTimeout();
         }
+        _super.prototype._next.call(this, value);
     };
-    TimeoutWithSubscriber.prototype._error = function (err) {
-        this.destination.error(err);
-        this._hasCompleted = true;
-    };
-    TimeoutWithSubscriber.prototype._complete = function () {
-        this.destination.complete();
-        this._hasCompleted = true;
-    };
-    TimeoutWithSubscriber.prototype.handleTimeout = function () {
-        if (!this.closed) {
-            var withObservable = this.withObservable;
-            this.unsubscribe();
-            this.destination.add(this.timeoutSubscription = subscribeToResult_1.subscribeToResult(this, withObservable));
-        }
+    TimeoutWithSubscriber.prototype._unsubscribe = function () {
+        this.action = null;
+        this.scheduler = null;
+        this.withObservable = null;
     };
     return TimeoutWithSubscriber;
 }(OuterSubscriber_1.OuterSubscriber));
@@ -5601,8 +5584,8 @@ function subscribeToResult(outerSubscriber, result, outerValue, outerIndex) {
         });
         return destination;
     }
-    else if (result && typeof result[iterator_1.$$iterator] === 'function') {
-        var iterator = result[iterator_1.$$iterator]();
+    else if (result && typeof result[iterator_1.iterator] === 'function') {
+        var iterator = result[iterator_1.iterator]();
         do {
             var item = iterator.next();
             if (item.done) {
@@ -5615,8 +5598,8 @@ function subscribeToResult(outerSubscriber, result, outerValue, outerIndex) {
             }
         } while (true);
     }
-    else if (result && typeof result[observable_1.$$observable] === 'function') {
-        var obs = result[observable_1.$$observable]();
+    else if (result && typeof result[observable_1.observable] === 'function') {
+        var obs = result[observable_1.observable]();
         if (typeof obs.subscribe !== 'function') {
             destination.error(new TypeError('Provided object does not correctly implement Symbol.observable'));
         }
@@ -6692,54 +6675,36 @@ var TimeoutSubscriber = (function (_super) {
         this.waitFor = waitFor;
         this.scheduler = scheduler;
         this.errorInstance = errorInstance;
-        this.index = 0;
-        this._previousIndex = 0;
-        this._hasCompleted = false;
+        this.action = null;
         this.scheduleTimeout();
     }
-    Object.defineProperty(TimeoutSubscriber.prototype, "previousIndex", {
-        get: function () {
-            return this._previousIndex;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(TimeoutSubscriber.prototype, "hasCompleted", {
-        get: function () {
-            return this._hasCompleted;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    TimeoutSubscriber.dispatchTimeout = function (state) {
-        var source = state.subscriber;
-        var currentIndex = state.index;
-        if (!source.hasCompleted && source.previousIndex === currentIndex) {
-            source.notifyTimeout();
-        }
+    TimeoutSubscriber.dispatchTimeout = function (subscriber) {
+        subscriber.error(subscriber.errorInstance);
     };
     TimeoutSubscriber.prototype.scheduleTimeout = function () {
-        var currentIndex = this.index;
-        this.scheduler.schedule(TimeoutSubscriber.dispatchTimeout, this.waitFor, { subscriber: this, index: currentIndex });
-        this.index++;
-        this._previousIndex = currentIndex;
+        var action = this.action;
+        if (action) {
+            // Recycle the action if we've already scheduled one. All the production
+            // Scheduler Actions mutate their state/delay time and return themeselves.
+            // VirtualActions are immutable, so they create and return a clone. In this
+            // case, we need to set the action reference to the most recent VirtualAction,
+            // to ensure that's the one we clone from next time.
+            this.action = action.schedule(this, this.waitFor);
+        }
+        else {
+            this.add(this.action = this.scheduler.schedule(TimeoutSubscriber.dispatchTimeout, this.waitFor, this));
+        }
     };
     TimeoutSubscriber.prototype._next = function (value) {
-        this.destination.next(value);
         if (!this.absoluteTimeout) {
             this.scheduleTimeout();
         }
+        _super.prototype._next.call(this, value);
     };
-    TimeoutSubscriber.prototype._error = function (err) {
-        this.destination.error(err);
-        this._hasCompleted = true;
-    };
-    TimeoutSubscriber.prototype._complete = function () {
-        this.destination.complete();
-        this._hasCompleted = true;
-    };
-    TimeoutSubscriber.prototype.notifyTimeout = function () {
-        this.error(this.errorInstance);
+    TimeoutSubscriber.prototype._unsubscribe = function () {
+        this.action = null;
+        this.scheduler = null;
+        this.errorInstance = null;
     };
     return TimeoutSubscriber;
 }(Subscriber_1.Subscriber));
@@ -6800,7 +6765,7 @@ var Subject = (function (_super) {
         this.hasError = false;
         this.thrownError = null;
     }
-    Subject.prototype[rxSubscriber_1.$$rxSubscriber] = function () {
+    Subject.prototype[rxSubscriber_1.rxSubscriber] = function () {
         return new SubjectSubscriber(this);
     };
     Subject.prototype.lift = function (operator) {
@@ -7937,9 +7902,9 @@ exports.Scheduler = Scheduler;
  * to retrieve an iterator from an object.
  */
 var Symbol = {
-    rxSubscriber: rxSubscriber_1.$$rxSubscriber,
-    observable: observable_1.$$observable,
-    iterator: iterator_1.$$iterator
+    rxSubscriber: rxSubscriber_1.rxSubscriber,
+    observable: observable_1.observable,
+    iterator: iterator_1.iterator
 };
 exports.Symbol = Symbol;
 //# sourceMappingURL=Rx.js.map
@@ -8586,7 +8551,7 @@ var FromObservable = (function (_super) {
      */
     FromObservable.create = function (ish, scheduler) {
         if (ish != null) {
-            if (typeof ish[observable_1.$$observable] === 'function') {
+            if (typeof ish[observable_1.observable] === 'function') {
                 if (ish instanceof Observable_1.Observable && !scheduler) {
                     return ish;
                 }
@@ -8598,7 +8563,7 @@ var FromObservable = (function (_super) {
             else if (isPromise_1.isPromise(ish)) {
                 return new PromiseObservable_1.PromiseObservable(ish, scheduler);
             }
-            else if (typeof ish[iterator_1.$$iterator] === 'function' || typeof ish === 'string') {
+            else if (typeof ish[iterator_1.iterator] === 'function' || typeof ish === 'string') {
                 return new IteratorObservable_1.IteratorObservable(ish, scheduler);
             }
             else if (isArrayLike_1.isArrayLike(ish)) {
@@ -8611,10 +8576,10 @@ var FromObservable = (function (_super) {
         var ish = this.ish;
         var scheduler = this.scheduler;
         if (scheduler == null) {
-            return ish[observable_1.$$observable]().subscribe(subscriber);
+            return ish[observable_1.observable]().subscribe(subscriber);
         }
         else {
-            return ish[observable_1.$$observable]().subscribe(new observeOn_1.ObserveOnSubscriber(subscriber, scheduler, 0));
+            return ish[observable_1.observable]().subscribe(new observeOn_1.ObserveOnSubscriber(subscriber, scheduler, 0));
         }
     };
     return FromObservable;
@@ -9703,9 +9668,15 @@ var BufferCountOperator = (function () {
     function BufferCountOperator(bufferSize, startBufferEvery) {
         this.bufferSize = bufferSize;
         this.startBufferEvery = startBufferEvery;
+        if (!startBufferEvery || bufferSize === startBufferEvery) {
+            this.subscriberClass = BufferCountSubscriber;
+        }
+        else {
+            this.subscriberClass = BufferSkipCountSubscriber;
+        }
     }
     BufferCountOperator.prototype.call = function (subscriber, source) {
-        return source.subscribe(new BufferCountSubscriber(subscriber, this.bufferSize, this.startBufferEvery));
+        return source.subscribe(new this.subscriberClass(subscriber, this.bufferSize, this.startBufferEvery));
     };
     return BufferCountOperator;
 }());
@@ -9716,18 +9687,46 @@ var BufferCountOperator = (function () {
  */
 var BufferCountSubscriber = (function (_super) {
     __extends(BufferCountSubscriber, _super);
-    function BufferCountSubscriber(destination, bufferSize, startBufferEvery) {
+    function BufferCountSubscriber(destination, bufferSize) {
+        _super.call(this, destination);
+        this.bufferSize = bufferSize;
+        this.buffer = [];
+    }
+    BufferCountSubscriber.prototype._next = function (value) {
+        var buffer = this.buffer;
+        buffer.push(value);
+        if (buffer.length == this.bufferSize) {
+            this.destination.next(buffer);
+            this.buffer = [];
+        }
+    };
+    BufferCountSubscriber.prototype._complete = function () {
+        var buffer = this.buffer;
+        if (buffer.length > 0) {
+            this.destination.next(buffer);
+        }
+        _super.prototype._complete.call(this);
+    };
+    return BufferCountSubscriber;
+}(Subscriber_1.Subscriber));
+/**
+ * We need this JSDoc comment for affecting ESDoc.
+ * @ignore
+ * @extends {Ignored}
+ */
+var BufferSkipCountSubscriber = (function (_super) {
+    __extends(BufferSkipCountSubscriber, _super);
+    function BufferSkipCountSubscriber(destination, bufferSize, startBufferEvery) {
         _super.call(this, destination);
         this.bufferSize = bufferSize;
         this.startBufferEvery = startBufferEvery;
         this.buffers = [];
         this.count = 0;
     }
-    BufferCountSubscriber.prototype._next = function (value) {
-        var count = this.count++;
-        var _a = this, destination = _a.destination, bufferSize = _a.bufferSize, startBufferEvery = _a.startBufferEvery, buffers = _a.buffers;
-        var startOn = (startBufferEvery == null) ? bufferSize : startBufferEvery;
-        if (count % startOn === 0) {
+    BufferSkipCountSubscriber.prototype._next = function (value) {
+        var _a = this, bufferSize = _a.bufferSize, startBufferEvery = _a.startBufferEvery, buffers = _a.buffers, count = _a.count;
+        this.count++;
+        if (count % startBufferEvery === 0) {
             buffers.push([]);
         }
         for (var i = buffers.length; i--;) {
@@ -9735,13 +9734,12 @@ var BufferCountSubscriber = (function (_super) {
             buffer.push(value);
             if (buffer.length === bufferSize) {
                 buffers.splice(i, 1);
-                destination.next(buffer);
+                this.destination.next(buffer);
             }
         }
     };
-    BufferCountSubscriber.prototype._complete = function () {
-        var destination = this.destination;
-        var buffers = this.buffers;
+    BufferSkipCountSubscriber.prototype._complete = function () {
+        var _a = this, buffers = _a.buffers, destination = _a.destination;
         while (buffers.length > 0) {
             var buffer = buffers.shift();
             if (buffer.length > 0) {
@@ -9750,7 +9748,7 @@ var BufferCountSubscriber = (function (_super) {
         }
         _super.prototype._complete.call(this);
     };
-    return BufferCountSubscriber;
+    return BufferSkipCountSubscriber;
 }(Subscriber_1.Subscriber));
 //# sourceMappingURL=bufferCount.js.map
 
@@ -10836,8 +10834,8 @@ var ZipSubscriber = (function (_super) {
         if (isArray_1.isArray(value)) {
             iterators.push(new StaticArrayIterator(value));
         }
-        else if (typeof value[iterator_1.$$iterator] === 'function') {
-            iterators.push(new StaticIterator(value[iterator_1.$$iterator]()));
+        else if (typeof value[iterator_1.iterator] === 'function') {
+            iterators.push(new StaticIterator(value[iterator_1.iterator]()));
         }
         else {
             iterators.push(new ZipBufferIterator(this.destination, this, value));
@@ -10846,6 +10844,10 @@ var ZipSubscriber = (function (_super) {
     ZipSubscriber.prototype._complete = function () {
         var iterators = this.iterators;
         var len = iterators.length;
+        if (len === 0) {
+            this.destination.complete();
+            return;
+        }
         this.active = len;
         for (var i = 0; i < len; i++) {
             var iterator = iterators[i];
@@ -10940,7 +10942,7 @@ var StaticArrayIterator = (function () {
         this.length = 0;
         this.length = array.length;
     }
-    StaticArrayIterator.prototype[iterator_1.$$iterator] = function () {
+    StaticArrayIterator.prototype[iterator_1.iterator] = function () {
         return this;
     };
     StaticArrayIterator.prototype.next = function (value) {
@@ -10971,7 +10973,7 @@ var ZipBufferIterator = (function (_super) {
         this.buffer = [];
         this.isComplete = false;
     }
-    ZipBufferIterator.prototype[iterator_1.$$iterator] = function () {
+    ZipBufferIterator.prototype[iterator_1.iterator] = function () {
         return this;
     };
     // NOTE: there is actually a name collision here with Subscriber.next and Iterator.next
@@ -11030,7 +11032,7 @@ var Subscriber_1 = __webpack_require__("mmVS");
  * an Observable that is identical to the source.
  *
  * <span class="informal">Intercepts each emission on the source and runs a
- * function, but returns an output which is identical to the source.</span>
+ * function, but returns an output which is identical to the source as long as errors don't occur.</span>
  *
  * <img src="./img/do.png" width="100%">
  *
@@ -11683,7 +11685,7 @@ var StringIterator = (function () {
         this.idx = idx;
         this.len = len;
     }
-    StringIterator.prototype[iterator_1.$$iterator] = function () { return (this); };
+    StringIterator.prototype[iterator_1.iterator] = function () { return (this); };
     StringIterator.prototype.next = function () {
         return this.idx < this.len ? {
             done: false,
@@ -11703,7 +11705,7 @@ var ArrayIterator = (function () {
         this.idx = idx;
         this.len = len;
     }
-    ArrayIterator.prototype[iterator_1.$$iterator] = function () { return this; };
+    ArrayIterator.prototype[iterator_1.iterator] = function () { return this; };
     ArrayIterator.prototype.next = function () {
         return this.idx < this.len ? {
             done: false,
@@ -11716,7 +11718,7 @@ var ArrayIterator = (function () {
     return ArrayIterator;
 }());
 function getIterator(obj) {
-    var i = obj[iterator_1.$$iterator];
+    var i = obj[iterator_1.iterator];
     if (!i && typeof obj === 'string') {
         return new StringIterator(obj);
     }
@@ -11726,7 +11728,7 @@ function getIterator(obj) {
     if (!i) {
         throw new TypeError('object is not iterable');
     }
-    return obj[iterator_1.$$iterator]();
+    return obj[iterator_1.iterator]();
 }
 var maxSafeInteger = Math.pow(2, 53) - 1;
 function toLength(o) {
@@ -12095,36 +12097,120 @@ function deduceShape(descriptor) {
         return "vector";
     return "matrix";
 }
-function reshape(outputs, id, inputSampleRate, stepSize, descriptor, adjustTimestamps = true) {
+function reshapeVector(features, stepDuration, descriptor) {
+    // Determine whether a purported vector output (fixed spacing, one
+    // bin per feature) should actually be returned as multiple
+    // tracks, because it has gaps between features or feature timings
+    // that overlap
+    const tracks = [];
+    let currentTrack = [];
+    let currentStartTime = 0;
+    let n = -1;
+    const outputArr = features instanceof Array ? features : [...features];
+    for (let i = 0; i < outputArr.length; ++i) {
+        const f = outputArr[i];
+        n = n + 1;
+        if (descriptor.sampleType == FeatureExtractor_1.SampleType.FixedSampleRate &&
+            typeof (f.timestamp) !== 'undefined') {
+            const m = Math.round(Timestamp_1.toSeconds(f.timestamp) / stepDuration);
+            if (m !== n) {
+                if (currentTrack.length > 0) {
+                    tracks.push({
+                        startTime: currentStartTime,
+                        stepDuration,
+                        data: new Float32Array(currentTrack)
+                    });
+                    currentTrack = [];
+                    n = m;
+                }
+                currentStartTime = m * stepDuration;
+            }
+        }
+        currentTrack.push(f.featureValues[0]);
+    }
+    if (tracks.length > 0) {
+        if (currentTrack.length > 0) {
+            tracks.push({
+                startTime: currentStartTime,
+                stepDuration,
+                data: new Float32Array(currentTrack)
+            });
+        }
+        return {
+            shape: "tracks",
+            collected: tracks
+        };
+    }
+    else {
+        return {
+            shape: "vector",
+            collected: {
+                startTime: currentStartTime,
+                stepDuration,
+                data: new Float32Array(currentTrack)
+            }
+        };
+    }
+}
+function reshapeMatrix(features, stepDuration, descriptor) {
+    const outputArr = features instanceof Array ? features : [...features];
+    if (outputArr.length === 0) {
+        return {
+            shape: "matrix",
+            collected: {
+                startTime: 0,
+                stepDuration,
+                data: []
+            }
+        };
+    }
+    else {
+        const firstFeature = outputArr[0];
+        let startTime = 0;
+        if (descriptor.sampleType == FeatureExtractor_1.SampleType.FixedSampleRate &&
+            typeof (firstFeature.timestamp) !== 'undefined') {
+            const m = Math.round(Timestamp_1.toSeconds(firstFeature.timestamp) /
+                stepDuration);
+            startTime = m * stepDuration;
+        }
+        return {
+            shape: "matrix",
+            collected: {
+                startTime,
+                stepDuration,
+                data: outputArr.map(feature => new Float32Array(feature.featureValues))
+            }
+        };
+    }
+}
+function reshapeList(features, adjuster) {
+    return {
+        shape: "list",
+        collected: [...features].map(feature => {
+            if (adjuster) {
+                adjuster.adjust(feature);
+            }
+            return feature;
+        })
+    };
+}
+function reshape(features, inputSampleRate, stepSize, descriptor, adjustTimestamps = true) {
     const shape = deduceShape(descriptor);
     const stepDuration = getFeatureStepDuration(inputSampleRate, stepSize, descriptor);
     const adjuster = FeatureTimeAdjuster_1.createFeatureTimeAdjuster(descriptor, stepDuration);
-    // TODO switch suggests that matrix and list could be types, dynamically dispatch to a .data() method or similar
-    // TODO adjust timestamps for vector and matrix?
     switch (shape) {
         case "vector":
-            return {
-                shape: shape,
-                stepDuration: stepDuration,
-                data: new Float32Array([...outputs].map(output => output[id].featureValues[0]))
-            };
+            // NB this could return either "vector" or "tracks" shape,
+            // depending on the feature data
+            return reshapeVector(features, stepDuration, descriptor);
         case "matrix":
-            return {
-                shape: shape,
-                stepDuration: stepDuration,
-                data: [...outputs].map(output => new Float32Array(output[id].featureValues))
-            };
+            return reshapeMatrix(features, stepDuration, descriptor);
         case "list":
-            return {
-                shape: shape,
-                data: [...outputs].map(output => {
-                    const feature = output[id];
-                    if (adjustTimestamps)
-                        adjuster.adjust(feature);
-                    return feature;
-                })
-            };
+            return reshapeList(features, adjustTimestamps ? adjuster : null);
         default:
+            // Assumption here that deduceShape can't return "tracks",
+            // because it can't tell the difference between vector and
+            // tracks without looking at potentially all the data
             throw new Error("A valid shape could not be deduced.");
     }
 }
@@ -12152,7 +12238,12 @@ function collect(createAudioStreamCallback, streamFormat, createFeatureExtractor
         throw Error("Invalid output identifier.");
     const descriptor = outputs.outputs.get(outputId);
     const lazyOutputs = processConfiguredExtractor(stream.frames, stream.format.sampleRate, config.framing.stepSize, extractor, [outputId]);
-    return reshape(lazyOutputs, outputId, stream.format.sampleRate, config.framing.stepSize, descriptor);
+    const lazyFeatures = (function* () {
+        for (const output of lazyOutputs) {
+            yield output[outputId];
+        }
+    })();
+    return reshape(lazyFeatures, stream.format.sampleRate, config.framing.stepSize, descriptor);
 }
 exports.collect = collect;
 function* process(createAudioStreamCallback, streamFormat, createFeatureExtractorCallback, extractorKey, outputId, params, args = {}) {
@@ -12272,16 +12363,11 @@ class PiperSimpleClient {
                 return forceList ? {
                     features: {
                         shape: "list",
-                        data: features
+                        collected: features
                     },
                     outputDescriptor: res.outputDescriptor
                 } : {
-                    features: reshape(/* TODO avoid reshaping for list */ features.map(feature => {
-                        return {
-                            [res.configuredOutputId]: feature
-                        };
-                    }), // map FeatureList to {outputId: Feature}[]
-                    res.configuredOutputId, res.inputSampleRate, res.configuredStepSize, res.outputDescriptor.configured, false),
+                    features: reshape(features, res.inputSampleRate, res.configuredStepSize, res.outputDescriptor.configured, false),
                     outputDescriptor: res.outputDescriptor
                 };
             });
@@ -12648,16 +12734,22 @@ var SwitchMapSubscriber = (function (_super) {
 
 "use strict";
 /* WEBPACK VAR INJECTION */(function(global) {
-/**
- * window: browser in DOM main thread
- * self: browser in WebWorker
- * global: Node.js/other
- */
-exports.root = (typeof window == 'object' && window.window === window && window
-    || typeof self == 'object' && self.self === self && self
-    || typeof global == 'object' && global.global === global && global);
-if (!exports.root) {
-    throw new Error('RxJS could not find any global context (window, self, global)');
+if (typeof window == 'object' && window.window === window) {
+    exports.root = window;
+}
+else if (typeof self == 'object' && self.self === self) {
+    exports.root = self;
+}
+else if (typeof global == 'object' && global.global === global) {
+    exports.root = global;
+}
+else {
+    // Workaround Closure Compiler restriction: The body of a goog.module cannot use throw.
+    // This is needed when used with angular/tsickle which inserts a goog.module statement.
+    // Wrap in IIFE
+    (function () {
+        throw new Error('RxJS could not find any global context (window, self, global)');
+    })();
 }
 //# sourceMappingURL=root.js.map
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__("DuR2")))
@@ -12874,6 +12966,10 @@ process.off = noop;
 process.removeListener = noop;
 process.removeAllListeners = noop;
 process.emit = noop;
+process.prependListener = noop;
+process.prependOnceListener = noop;
+
+process.listeners = function (name) { return [] }
 
 process.binding = function (name) {
     throw new Error('process.binding is not supported');
@@ -14985,6 +15081,52 @@ var FastMap_1 = __webpack_require__("1kxm");
  *
  * <img src="./img/groupBy.png" width="100%">
  *
+ * @example <caption>Group objects by id and return as array</caption>
+ * Observable.of<Obj>({id: 1, name: 'aze1'},
+ *                    {id: 2, name: 'sf2'},
+ *                    {id: 2, name: 'dg2'},
+ *                    {id: 1, name: 'erg1'},
+ *                    {id: 1, name: 'df1'},
+ *                    {id: 2, name: 'sfqfb2'},
+ *                    {id: 3, name: 'qfs3'},
+ *                    {id: 2, name: 'qsgqsfg2'}
+ *     )
+ *     .groupBy(p => p.id)
+ *     .flatMap( (group$) => group$.reduce((acc, cur) => [...acc, cur], []))
+ *     .subscribe(p => console.log(p));
+ *
+ * // displays:
+ * // [ { id: 1, name: 'aze1' },
+ * //   { id: 1, name: 'erg1' },
+ * //   { id: 1, name: 'df1' } ]
+ * //
+ * // [ { id: 2, name: 'sf2' },
+ * //   { id: 2, name: 'dg2' },
+ * //   { id: 2, name: 'sfqfb2' },
+ * //   { id: 2, name: 'qsgqsfg2' } ]
+ * //
+ * // [ { id: 3, name: 'qfs3' } ]
+ *
+ * @example <caption>Pivot data on the id field</caption>
+ * Observable.of<Obj>({id: 1, name: 'aze1'},
+ *                    {id: 2, name: 'sf2'},
+ *                    {id: 2, name: 'dg2'},
+ *                    {id: 1, name: 'erg1'},
+ *                    {id: 1, name: 'df1'},
+ *                    {id: 2, name: 'sfqfb2'},
+ *                    {id: 3, name: 'qfs1'},
+ *                    {id: 2, name: 'qsgqsfg2'}
+ *                   )
+ *     .groupBy(p => p.id, p => p.anme)
+ *     .flatMap( (group$) => group$.reduce((acc, cur) => [...acc, cur], ["" + group$.key]))
+ *     .map(arr => ({'id': parseInt(arr[0]), 'values': arr.slice(1)}))
+ *     .subscribe(p => console.log(p));
+ *
+ * // displays:
+ * // { id: 1, values: [ 'aze1', 'erg1', 'df1' ] }
+ * // { id: 2, values: [ 'sf2', 'dg2', 'sfqfb2', 'qsgqsfg2' ] }
+ * // { id: 3, values: [ 'qfs1' ] }
+ *
  * @param {function(value: T): K} keySelector A function that extracts the key
  * for each item.
  * @param {function(value: T): R} [elementSelector] A function that extracts the
@@ -15413,7 +15555,11 @@ function symbolIteratorPonyfill(root) {
     }
 }
 exports.symbolIteratorPonyfill = symbolIteratorPonyfill;
-exports.$$iterator = symbolIteratorPonyfill(root_1.root);
+exports.iterator = symbolIteratorPonyfill(root_1.root);
+/**
+ * @deprecated use iterator instead
+ */
+exports.$$iterator = exports.iterator;
 //# sourceMappingURL=iterator.js.map
 
 /***/ }),
@@ -15657,11 +15803,11 @@ var AsyncAction = (function (_super) {
     AsyncAction.prototype.recycleAsyncId = function (scheduler, id, delay) {
         if (delay === void 0) { delay = 0; }
         // If this action is rescheduled with the same delay time, don't clear the interval id.
-        if (delay !== null && this.delay === delay) {
+        if (delay !== null && this.delay === delay && this.pending === false) {
             return id;
         }
         // Otherwise, if the action's delay time is different from the current delay,
-        // clear the interval id
+        // or the action has been rescheduled before it's executed, clear the interval id
         return root_1.root.clearInterval(id) && undefined || undefined;
     };
     /**
@@ -15909,6 +16055,25 @@ function streamFeatures(request, service, config) {
         segmentAndExtractAsync(request, service, config, (features) => observer.next(features), () => observer.complete()).catch(err => observer.error(err));
     });
 }
+function collect(featureStream, onNext) {
+    return featureStream
+        .reduce((acc, val) => {
+        if (onNext) {
+            onNext(val);
+        }
+        for (let i = 0, len = val.features.length; i < len; ++i) {
+            acc.features.push(val.features[i]);
+        }
+        if (val.configuration) {
+            acc.config = val.configuration;
+        }
+        return acc;
+    }, { features: [], config: null })
+        .map(val => {
+        return HigherLevelUtilities_1.reshape(val.features, val.config.inputSampleRate, val.config.framing.stepSize, val.config.outputDescriptor.configured, false);
+    }).toPromise();
+}
+exports.collect = collect;
 class PiperStreamingService {
     constructor(service) {
         this.client = new PiperClient_1.PiperClient(service); // TODO should this be injected?
@@ -15917,20 +16082,9 @@ class PiperStreamingService {
         return this.client.list(request);
     }
     process(request) {
-        return this.createResponseObservable(request, (output) => ({
-            shape: "list",
-            data: output
-        }));
+        return this.createResponseObservable(request);
     }
-    // TODO reduce dupe with above process
-    collect(request) {
-        return this.createResponseObservable(request, (output, config) => {
-            return HigherLevelUtilities_1.reshape(
-            // map FeatureList to {outputId: Feature}[]
-            output.map(feature => ({ [config.configuredOutputId]: feature })), config.configuredOutputId, config.inputSampleRate, config.configuredStepSize, config.outputDescriptor.configured, false);
-        });
-    }
-    createResponseObservable(request, mapToFeatureCollection) {
+    createResponseObservable(request) {
         return rxjs_1.Observable.fromPromise(HigherLevelUtilities_1.loadAndConfigure(request, this.client)).flatMap((config) => {
             return streamFeatures(request, this.client, config)
                 .map((features, i) => {
@@ -15941,11 +16095,18 @@ class PiperStreamingService {
                         processedBlockCount: i + 1,
                         totalBlockCount: Math.ceil(nSamples / config.configuredStepSize) + 1 /* Plus one for finish block */
                     } : { processedBlockCount: i + 1 };
-                const partialResponse = {
-                    features: mapToFeatureCollection(output, config),
-                    outputDescriptor: config.outputDescriptor
-                };
-                return Object.assign({}, progress, partialResponse);
+                return i === 0 ? {
+                    features: output,
+                    progress: progress,
+                    configuration: {
+                        outputDescriptor: config.outputDescriptor,
+                        framing: {
+                            stepSize: config.configuredStepSize,
+                            blockSize: config.configuredBlockSize
+                        },
+                        inputSampleRate: config.inputSampleRate
+                    }
+                } : { features: output, progress: progress };
             });
         });
     }
@@ -17872,8 +18033,8 @@ function toSubscriber(nextOrObserver, error, complete) {
         if (nextOrObserver instanceof Subscriber_1.Subscriber) {
             return nextOrObserver;
         }
-        if (nextOrObserver[rxSubscriber_1.$$rxSubscriber]) {
-            return nextOrObserver[rxSubscriber_1.$$rxSubscriber]();
+        if (nextOrObserver[rxSubscriber_1.rxSubscriber]) {
+            return nextOrObserver[rxSubscriber_1.rxSubscriber]();
         }
     }
     if (!nextOrObserver && !error && !complete) {
@@ -17924,11 +18085,11 @@ Observable_1.Observable.webSocket = webSocket_1.webSocket;
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_piper__ = __webpack_require__("eGCF");
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_piper___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_piper__);
-
 const arrayReducer = (acc, val) => {
-    acc.push.apply(acc, val);
+    const len = val.length;
+    for (let i = 0; i < len; ++i) {
+        acc.push(val[i]);
+    }
     return acc;
 };
 /* unused harmony export arrayReducer */
@@ -17942,34 +18103,12 @@ const inPlaceTypedArrayReducer = (acc, val, i) => {
     acc.set(val, i);
     return acc;
 };
-const streamingResponseReducer = (acc, val, i) => {
-    acc.processedBlockCount = val.processedBlockCount;
-    if (acc.features.data instanceof Array &&
-        val.features.data instanceof Array) {
-        acc.features.data = arrayReducer(acc.features.data, val.features.data);
+const streamingResponseReducer = (acc, val) => {
+    acc.progress = val.progress;
+    if (val.configuration) {
+        acc.configuration = val.configuration;
     }
-    else if (acc.features.data instanceof Float32Array &&
-        val.features.data instanceof Float32Array) {
-        const isOneSamplePerStep = acc.outputDescriptor.configured.sampleType ===
-            __WEBPACK_IMPORTED_MODULE_0_piper__["SampleType"].OneSamplePerStep;
-        if (isOneSamplePerStep) {
-            // for one sample per step vectors we know there will be totalBlockCount
-            // number of samples - so pre-allocate the Float32Array when we know
-            // the totalBlockCount (after receiving the first feature)
-            if (i === 1) {
-                const newBlock = new Float32Array(acc.totalBlockCount);
-                newBlock[0] = acc.features.data[0];
-                acc.features.data = newBlock;
-            }
-            acc.features.data = inPlaceTypedArrayReducer(acc.features.data, val.features.data, i);
-        }
-        else {
-            acc.features.data = typedArrayReducer(acc.features.data, val.features.data);
-        }
-    }
-    else {
-        throw new Error('Invalid feature output. Aborting');
-    }
+    arrayReducer(acc.features, val.features);
     return acc;
 };
 /* harmony export (immutable) */ __webpack_exports__["a"] = streamingResponseReducer;
@@ -18013,7 +18152,11 @@ function getSymbolObservable(context) {
     return $$observable;
 }
 exports.getSymbolObservable = getSymbolObservable;
-exports.$$observable = getSymbolObservable(root_1.root);
+exports.observable = getSymbolObservable(root_1.root);
+/**
+ * @deprecated use observable instead
+ */
+exports.$$observable = exports.observable;
 //# sourceMappingURL=observable.js.map
 
 /***/ }),
@@ -18084,7 +18227,7 @@ var Subscriber = (function (_super) {
                 break;
         }
     }
-    Subscriber.prototype[rxSubscriber_1.$$rxSubscriber] = function () { return this; };
+    Subscriber.prototype[rxSubscriber_1.rxSubscriber] = function () { return this; };
     /**
      * A static factory for a Subscriber, given a (potentially partial) definition
      * of an Observer.
@@ -18186,14 +18329,16 @@ var SafeSubscriber = (function (_super) {
             next = observerOrNext;
         }
         else if (observerOrNext) {
-            context = observerOrNext;
             next = observerOrNext.next;
             error = observerOrNext.error;
             complete = observerOrNext.complete;
-            if (isFunction_1.isFunction(context.unsubscribe)) {
-                this.add(context.unsubscribe.bind(context));
+            if (observerOrNext !== Observer_1.empty) {
+                context = Object.create(observerOrNext);
+                if (isFunction_1.isFunction(context.unsubscribe)) {
+                    this.add(context.unsubscribe.bind(context));
+                }
+                context.unsubscribe = this.unsubscribe.bind(this);
             }
-            context.unsubscribe = this.unsubscribe.bind(this);
         }
         this._context = context;
         this._next = next;
@@ -18310,7 +18455,7 @@ var root_1 = __webpack_require__("VOfZ");
  * @example
  * // Using normal ES2015
  * let source = Rx.Observable
- *   .just(42)
+ *   .of(42)
  *   .toPromise();
  *
  * source.then((value) => console.log('Value: %s', value));
@@ -18339,7 +18484,7 @@ var root_1 = __webpack_require__("VOfZ");
  *
  * // Setting via the method
  * let source = Rx.Observable
- *   .just(42)
+ *   .of(42)
  *   .toPromise(RSVP.Promise);
  *
  * source.then((value) => console.log('Value: %s', value));
@@ -18669,7 +18814,6 @@ class WebWorkerStreamingServer {
                     .catch(err => this.sendError(request, err));
                 break;
             case "process":
-            case "collect":
                 this.createObservable(request);
                 break;
             default:
@@ -18677,10 +18821,7 @@ class WebWorkerStreamingServer {
         }
     }
     createObservable(request) {
-        const stream$ = request.method === "process" ?
-            this.service.process(request.params) :
-            this.service.collect(request.params);
-        stream$
+        this.service.process(request.params)
             .subscribe((response) => this.sendResponse(request, response), (err) => this.sendError(request, err), () => this.sendComplete(request));
     }
     sendError(info, message) {
@@ -19272,6 +19413,7 @@ var VirtualAction = (function (_super) {
         this.scheduler = scheduler;
         this.work = work;
         this.index = index;
+        this.active = true;
         this.index = scheduler.index = index;
     }
     VirtualAction.prototype.schedule = function (state, delay) {
@@ -19279,6 +19421,7 @@ var VirtualAction = (function (_super) {
         if (!this.id) {
             return _super.prototype.schedule.call(this, state, delay);
         }
+        this.active = false;
         // If an action is rescheduled, we save allocations by mutating its state,
         // pushing it to the end of the scheduler queue, and recycling the action.
         // But since the VirtualTimeScheduler is used for testing, VirtualActions
@@ -19298,6 +19441,11 @@ var VirtualAction = (function (_super) {
     VirtualAction.prototype.recycleAsyncId = function (scheduler, id, delay) {
         if (delay === void 0) { delay = 0; }
         return undefined;
+    };
+    VirtualAction.prototype._execute = function (state, delay) {
+        if (this.active === true) {
+            return _super.prototype._execute.call(this, state, delay);
+        }
     };
     VirtualAction.sortActions = function (a, b) {
         if (a.delay === b.delay) {
@@ -19392,8 +19540,12 @@ Observable_1.Observable.prototype.combineLatest = combineLatest_1.combineLatest;
 
 var root_1 = __webpack_require__("VOfZ");
 var Symbol = root_1.root.Symbol;
-exports.$$rxSubscriber = (typeof Symbol === 'function' && typeof Symbol.for === 'function') ?
+exports.rxSubscriber = (typeof Symbol === 'function' && typeof Symbol.for === 'function') ?
     Symbol.for('rxSubscriber') : '@@rxSubscriber';
+/**
+ * @deprecated use rxSubscriber instead
+ */
+exports.$$rxSubscriber = exports.rxSubscriber;
 //# sourceMappingURL=rxSubscriber.js.map
 
 /***/ }),
@@ -19487,7 +19639,10 @@ var Observable = (function () {
             throw new Error('no Promise impl found');
         }
         return new PromiseCtor(function (resolve, reject) {
-            var subscription = _this.subscribe(function (value) {
+            // Must be declared in a separate statement to avoid a RefernceError when
+            // accessing subscription below in the closure due to Temporal Dead Zone.
+            var subscription;
+            subscription = _this.subscribe(function (value) {
                 if (subscription) {
                     // if there is a subscription, then we can surmise
                     // the next handling is asynchronous. Any errors thrown
@@ -19521,7 +19676,7 @@ var Observable = (function () {
      * @method Symbol.observable
      * @return {Observable} this instance of the observable
      */
-    Observable.prototype[observable_1.$$observable] = function () {
+    Observable.prototype[observable_1.observable] = function () {
         return this;
     };
     // HACK: Since TypeScript inherits static properties too, we have to
@@ -19638,6 +19793,8 @@ exports.ConnectableObservable = ConnectableObservable;
 exports.connectableObservableDescriptor = {
     operator: { value: null },
     _refCount: { value: 0, writable: true },
+    _subject: { value: null, writable: true },
+    _connection: { value: null, writable: true },
     _subscribe: { value: ConnectableObservable.prototype._subscribe },
     getSubject: { value: ConnectableObservable.prototype.getSubject },
     connect: { value: ConnectableObservable.prototype.connect },
@@ -21346,7 +21503,7 @@ var Subscriber_1 = __webpack_require__("mmVS");
  * applies a projection to each value and emits that projection in the output
  * Observable.
  *
- * @example <caption>Map every every click to the clientX position of that click</caption>
+ * @example <caption>Map every click to the clientX position of that click</caption>
  * var clicks = Rx.Observable.fromEvent(document, 'click');
  * var positions = clicks.map(ev => ev.clientX);
  * positions.subscribe(x => console.log(x));
