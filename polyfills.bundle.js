@@ -868,17 +868,33 @@ Observable_1.Observable.prototype.count = count_1.count;
 
 
 
+function waterfall(tasks) {
+    const reducer = (running, next) => {
+        return next.then(response => {
+            running = running.concat(response);
+            return running;
+        });
+    };
+    return tasks.reduce((runningResponses, nextResponse) => {
+        return runningResponses.then(response => {
+            return reducer(response, nextResponse());
+        });
+    }, Promise.resolve([]));
+}
 class AggregateStreamingService {
     constructor() {
         this.services = new Map();
-        this.services.set('vamp-example-plugins', new __WEBPACK_IMPORTED_MODULE_3_piper_StreamingService__["PiperStreamingService"](new __WEBPACK_IMPORTED_MODULE_0_piper__["PiperVampService"](__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1_piper_ext_VampExamplePluginsModule__["VampExamplePlugins"])())));
+        this.services.set('vamp-example-plugins', () => new __WEBPACK_IMPORTED_MODULE_3_piper_StreamingService__["PiperStreamingService"](new __WEBPACK_IMPORTED_MODULE_0_piper__["PiperVampService"](__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1_piper_ext_VampExamplePluginsModule__["VampExamplePlugins"])())));
     }
     addService(key, service) {
         this.services.set(key, service);
     }
     list(request) {
-        return Promise.all([...this.services.values()].map(client => client.list({}))).then(allAvailable => ({
-            available: allAvailable.reduce((all, current) => all.concat(current.available), [])
+        const listThunks = [
+            ...this.services.values()
+        ].map(createClient => () => createClient().list({}));
+        return waterfall(listThunks).then(responses => ({
+            available: responses.reduce((flat, res) => flat.concat(res.available), [])
         }));
     }
     process(request) {
@@ -886,8 +902,8 @@ class AggregateStreamingService {
     }
     dispatch(method, request) {
         const key = request.key.split(':')[0];
-        return this.services.has(key) ?
-            this.services.get(key)[method](request) : __WEBPACK_IMPORTED_MODULE_4_rxjs_Observable__["Observable"].throw('Invalid key');
+        return this.services.has(key) ? this.services.get(key)()[method](request) :
+            __WEBPACK_IMPORTED_MODULE_4_rxjs_Observable__["Observable"].throw('Invalid key');
     }
 }
 class ThrottledReducingAggregateService extends AggregateStreamingService {
@@ -921,44 +937,46 @@ class FeatureExtractionWorker {
     constructor(workerScope, requireJs) {
         this.requireJs = requireJs;
         this.workerScope = workerScope;
-        this.remoteLibraries = new Map();
         this.service = new ThrottledReducingAggregateService();
         this.setupImportLibraryListener();
         this.server = new __WEBPACK_IMPORTED_MODULE_2_piper_servers_WebWorkerStreamingServer__["WebWorkerStreamingServer"](this.workerScope, this.service);
     }
     setupImportLibraryListener() {
         this.workerScope.onmessage = (ev) => {
-            const sendResponse = (result) => {
-                this.workerScope.postMessage({
-                    method: ev.data.method,
-                    result: result
-                });
-            };
             switch (ev.data.method) {
-                case 'import':
-                    const key = ev.data.params;
-                    if (this.remoteLibraries.has(key)) {
-                        this.requireJs([this.remoteLibraries.get(key)], (plugin) => {
-                            // TODO a factory with more logic probably belongs in piper-js
-                            const lib = plugin.createLibrary();
-                            const isEmscriptenModule = typeof lib.cwrap === 'function';
-                            const service = new __WEBPACK_IMPORTED_MODULE_3_piper_StreamingService__["PiperStreamingService"](isEmscriptenModule ? new __WEBPACK_IMPORTED_MODULE_0_piper__["PiperVampService"](lib) : lib // TODO
-                            );
-                            this.service.addService(key, service);
-                            this.service.list({}).then(sendResponse);
-                        });
-                    }
-                    else {
-                        console.error('Non registered library key.'); // TODO handle error
-                    }
-                    break;
                 case 'addRemoteLibraries':
                     const available = ev.data.params;
-                    Object.keys(available).forEach(libraryKey => {
-                        this.remoteLibraries.set(libraryKey, available[libraryKey]);
+                    const importThunks = Object.keys(available).map(libraryKey => {
+                        return () => {
+                            return this.downloadRemoteLibrary(libraryKey, available[libraryKey]).then(createService => {
+                                this.service.addService(libraryKey, () => new __WEBPACK_IMPORTED_MODULE_3_piper_StreamingService__["PiperStreamingService"](createService()));
+                            });
+                        };
+                    });
+                    waterfall(importThunks)
+                        .then(() => this.service.list({}))
+                        .then(response => {
+                        this.workerScope.postMessage({
+                            method: 'import',
+                            result: response
+                        });
                     });
             }
         };
+    }
+    downloadRemoteLibrary(key, uri) {
+        return new Promise((res, rej) => {
+            this.requireJs([uri], (plugin) => {
+                res(() => {
+                    // TODO a factory with more logic probably belongs in piper-js
+                    const lib = plugin.createLibrary();
+                    const isEmscriptenModule = typeof lib.cwrap === 'function';
+                    return isEmscriptenModule ? new __WEBPACK_IMPORTED_MODULE_0_piper__["PiperVampService"](lib) : lib; // TODO
+                });
+            }, (err) => {
+                rej(`Failed to load ${key} remote module.`);
+            });
+        });
     }
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = FeatureExtractionWorker;
